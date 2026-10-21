@@ -1,0 +1,6 @@
+node_modules/
+npm-debug.log*
+
+# Scratch output of the CLI (bin/lossless-rotate.ts) and of manual experiments. Safe to delete at
+# any time; nothing in here is needed to build, test or publish the package.
+tmp/

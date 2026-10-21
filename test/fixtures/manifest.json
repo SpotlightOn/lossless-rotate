@@ -1,0 +1,997 @@
+{
+  "generatedBy": "scripts/make-fixtures.mjs",
+  "files": [
+    {
+      "file": "base/pattern-3x2-420.jpg",
+      "bytes": 326,
+      "kind": "base",
+      "frame": {
+        "width": 3,
+        "height": 2,
+        "sampling": "2x2,1x1,1x1",
+        "progressive": false
+      }
+    },
+    {
+      "file": "base/pattern-8x8-420.jpg",
+      "bytes": 397,
+      "kind": "base",
+      "frame": {
+        "width": 8,
+        "height": 8,
+        "sampling": "2x2,1x1,1x1",
+        "progressive": false
+      }
+    },
+    {
+      "file": "base/pattern-8x8-422.jpg",
+      "bytes": 402,
+      "kind": "base",
+      "frame": {
+        "width": 8,
+        "height": 8,
+        "sampling": "2x1,1x1,1x1",
+        "progressive": false
+      }
+    },
+    {
+      "file": "base/pattern-8x8-444.jpg",
+      "bytes": 404,
+      "kind": "base",
+      "frame": {
+        "width": 8,
+        "height": 8,
+        "sampling": "1x1,1x1,1x1",
+        "progressive": false
+      }
+    },
+    {
+      "file": "base/pattern-17x9-420.jpg",
+      "bytes": 514,
+      "kind": "base",
+      "frame": {
+        "width": 17,
+        "height": 9,
+        "sampling": "2x2,1x1,1x1",
+        "progressive": false
+      }
+    },
+    {
+      "file": "base/pattern-64x48-420.jpg",
+      "bytes": 2800,
+      "kind": "base",
+      "frame": {
+        "width": 64,
+        "height": 48,
+        "sampling": "2x2,1x1,1x1",
+        "progressive": false
+      }
+    },
+    {
+      "file": "base/pattern-64x48-422.jpg",
+      "bytes": 3610,
+      "kind": "base",
+      "frame": {
+        "width": 64,
+        "height": 48,
+        "sampling": "2x1,1x1,1x1",
+        "progressive": false
+      }
+    },
+    {
+      "file": "base/pattern-64x48-444.jpg",
+      "bytes": 5388,
+      "kind": "base",
+      "frame": {
+        "width": 64,
+        "height": 48,
+        "sampling": "1x1,1x1,1x1",
+        "progressive": false
+      }
+    },
+    {
+      "file": "base/pattern-41x27-420.jpg",
+      "bytes": 1437,
+      "kind": "base",
+      "frame": {
+        "width": 41,
+        "height": 27,
+        "sampling": "2x2,1x1,1x1",
+        "progressive": false
+      }
+    },
+    {
+      "file": "base/pattern-64x48-progressive-420.jpg",
+      "bytes": 2305,
+      "kind": "base",
+      "frame": {
+        "width": 64,
+        "height": 48,
+        "sampling": "2x2,1x1,1x1",
+        "progressive": true
+      }
+    },
+    {
+      "file": "exif-ii-01-tag.jpg",
+      "bytes": 362,
+      "byteOrder": "little",
+      "orientation": 1,
+      "entryOffset": 40,
+      "hasExif": true,
+      "expect": {
+        "read": 1
+      },
+      "layout": "orientation-only"
+    },
+    {
+      "file": "exif-ii-02-tag.jpg",
+      "bytes": 362,
+      "byteOrder": "little",
+      "orientation": 2,
+      "entryOffset": 40,
+      "hasExif": true,
+      "expect": {
+        "read": 2
+      },
+      "layout": "orientation-only"
+    },
+    {
+      "file": "exif-ii-03-tag.jpg",
+      "bytes": 362,
+      "byteOrder": "little",
+      "orientation": 3,
+      "entryOffset": 40,
+      "hasExif": true,
+      "expect": {
+        "read": 3
+      },
+      "layout": "orientation-only"
+    },
+    {
+      "file": "exif-ii-04-tag.jpg",
+      "bytes": 362,
+      "byteOrder": "little",
+      "orientation": 4,
+      "entryOffset": 40,
+      "hasExif": true,
+      "expect": {
+        "read": 4
+      },
+      "layout": "orientation-only"
+    },
+    {
+      "file": "exif-ii-05-tag.jpg",
+      "bytes": 362,
+      "byteOrder": "little",
+      "orientation": 5,
+      "entryOffset": 40,
+      "hasExif": true,
+      "expect": {
+        "read": 5
+      },
+      "layout": "orientation-only"
+    },
+    {
+      "file": "exif-ii-06-tag.jpg",
+      "bytes": 362,
+      "byteOrder": "little",
+      "orientation": 6,
+      "entryOffset": 40,
+      "hasExif": true,
+      "expect": {
+        "read": 6
+      },
+      "layout": "orientation-only"
+    },
+    {
+      "file": "exif-ii-07-tag.jpg",
+      "bytes": 362,
+      "byteOrder": "little",
+      "orientation": 7,
+      "entryOffset": 40,
+      "hasExif": true,
+      "expect": {
+        "read": 7
+      },
+      "layout": "orientation-only"
+    },
+    {
+      "file": "exif-ii-08-tag.jpg",
+      "bytes": 362,
+      "byteOrder": "little",
+      "orientation": 8,
+      "entryOffset": 40,
+      "hasExif": true,
+      "expect": {
+        "read": 8
+      },
+      "layout": "orientation-only"
+    },
+    {
+      "file": "exif-mm-01-tag.jpg",
+      "bytes": 362,
+      "byteOrder": "big",
+      "orientation": 1,
+      "entryOffset": 40,
+      "hasExif": true,
+      "expect": {
+        "read": 1
+      },
+      "layout": "orientation-only"
+    },
+    {
+      "file": "exif-mm-02-tag.jpg",
+      "bytes": 362,
+      "byteOrder": "big",
+      "orientation": 2,
+      "entryOffset": 40,
+      "hasExif": true,
+      "expect": {
+        "read": 2
+      },
+      "layout": "orientation-only"
+    },
+    {
+      "file": "exif-mm-03-tag.jpg",
+      "bytes": 362,
+      "byteOrder": "big",
+      "orientation": 3,
+      "entryOffset": 40,
+      "hasExif": true,
+      "expect": {
+        "read": 3
+      },
+      "layout": "orientation-only"
+    },
+    {
+      "file": "exif-mm-04-tag.jpg",
+      "bytes": 362,
+      "byteOrder": "big",
+      "orientation": 4,
+      "entryOffset": 40,
+      "hasExif": true,
+      "expect": {
+        "read": 4
+      },
+      "layout": "orientation-only"
+    },
+    {
+      "file": "exif-mm-05-tag.jpg",
+      "bytes": 362,
+      "byteOrder": "big",
+      "orientation": 5,
+      "entryOffset": 40,
+      "hasExif": true,
+      "expect": {
+        "read": 5
+      },
+      "layout": "orientation-only"
+    },
+    {
+      "file": "exif-mm-06-tag.jpg",
+      "bytes": 362,
+      "byteOrder": "big",
+      "orientation": 6,
+      "entryOffset": 40,
+      "hasExif": true,
+      "expect": {
+        "read": 6
+      },
+      "layout": "orientation-only"
+    },
+    {
+      "file": "exif-mm-07-tag.jpg",
+      "bytes": 362,
+      "byteOrder": "big",
+      "orientation": 7,
+      "entryOffset": 40,
+      "hasExif": true,
+      "expect": {
+        "read": 7
+      },
+      "layout": "orientation-only"
+    },
+    {
+      "file": "exif-mm-08-tag.jpg",
+      "bytes": 362,
+      "byteOrder": "big",
+      "orientation": 8,
+      "entryOffset": 40,
+      "hasExif": true,
+      "expect": {
+        "read": 8
+      },
+      "layout": "orientation-only"
+    },
+    {
+      "file": "exif-ii-06-make.jpg",
+      "bytes": 382,
+      "byteOrder": "little",
+      "orientation": 6,
+      "entryOffset": 52,
+      "hasExif": true,
+      "expect": {
+        "read": 6
+      },
+      "layout": "make+orientation"
+    },
+    {
+      "file": "exif-mm-06-make.jpg",
+      "bytes": 382,
+      "byteOrder": "big",
+      "orientation": 6,
+      "entryOffset": 52,
+      "hasExif": true,
+      "expect": {
+        "read": 6
+      },
+      "layout": "make+orientation"
+    },
+    {
+      "file": "exif-first.jpg",
+      "bytes": 362,
+      "kind": "layout",
+      "comment": "APP1 directly after SOI, no APP0/JFIF",
+      "expect": {
+        "read": 6
+      }
+    },
+    {
+      "file": "app0-app2-exif.jpg",
+      "bytes": 392,
+      "kind": "layout",
+      "comment": "JFIF, then an ICC APP2 chunk, then Exif",
+      "expect": {
+        "read": 6
+      }
+    },
+    {
+      "file": "xmp-then-exif.jpg",
+      "bytes": 407,
+      "kind": "layout",
+      "comment": "first APP1 is XMP, the Exif APP1 comes second",
+      "expect": {
+        "read": 6
+      }
+    },
+    {
+      "file": "no-exif.jpg",
+      "bytes": 326,
+      "kind": "layout",
+      "comment": "valid JPEG, no EXIF at all",
+      "expect": {
+        "read": 0
+      }
+    },
+    {
+      "file": "exif-without-orientation.jpg",
+      "bytes": 370,
+      "kind": "layout",
+      "comment": "EXIF present, tag 0x0112 absent",
+      "expect": {
+        "read": 0
+      }
+    },
+    {
+      "file": "err-empty.jpg",
+      "bytes": 0,
+      "kind": "error",
+      "comment": "empty file",
+      "expect": {
+        "error": "E_NOT_JPEG"
+      }
+    },
+    {
+      "file": "err-png.jpg",
+      "bytes": 16,
+      "kind": "error",
+      "comment": "PNG header",
+      "expect": {
+        "error": "E_NOT_JPEG"
+      }
+    },
+    {
+      "file": "err-soi-truncated.jpg",
+      "bytes": 3,
+      "kind": "error",
+      "comment": "only SOI and a partial marker",
+      "expect": {
+        "error": "E_PREMATURE_END"
+      }
+    },
+    {
+      "file": "err-app1-truncated.jpg",
+      "bytes": 10,
+      "kind": "error",
+      "comment": "APP1 length runs past EOF",
+      "expect": {
+        "error": "E_PREMATURE_END"
+      }
+    },
+    {
+      "file": "app1-not-exif.jpg",
+      "bytes": 336,
+      "kind": "layout",
+      "comment": "APP1 that is not an Exif block: skipped, so the file simply has no orientation (v1 raised E_INVALID_EXIF here)",
+      "expect": {
+        "read": 0
+      }
+    },
+    {
+      "file": "err-bad-tiff-magic.jpg",
+      "bytes": 362,
+      "kind": "error",
+      "comment": "TIFF magic is not 42",
+      "expect": {
+        "error": "E_INVALID_EXIF"
+      }
+    },
+    {
+      "file": "err-bad-byte-order.jpg",
+      "bytes": 362,
+      "kind": "error",
+      "comment": "TIFF header is neither II nor MM",
+      "expect": {
+        "error": "E_INVALID_EXIF"
+      }
+    },
+    {
+      "file": "err-ifd-offset-beyond-data.jpg",
+      "bytes": 362,
+      "kind": "error",
+      "comment": "IFD0 offset points past the APP1 payload",
+      "expect": {
+        "error": "E_INVALID_EXIF"
+      }
+    },
+    {
+      "file": "err-zero-tags.jpg",
+      "bytes": 362,
+      "kind": "error",
+      "comment": "IFD0 declares zero tags",
+      "expect": {
+        "error": "E_INVALID_EXIF"
+      }
+    },
+    {
+      "file": "err-orientation-value-9.jpg",
+      "bytes": 362,
+      "kind": "error",
+      "comment": "orientation value 9 is out of range",
+      "expect": {
+        "error": "E_INVALID_EXIF"
+      }
+    },
+    {
+      "file": "exif-far-ifd0.jpg",
+      "bytes": 2354,
+      "kind": "layout",
+      "byteOrder": "little",
+      "orientation": 6,
+      "entryOffset": 2032,
+      "comment": "IFD0 sits 2000 bytes behind the TIFF header",
+      "expect": {
+        "read": 6
+      }
+    },
+    {
+      "file": "orient-64x48-420-01.jpg",
+      "bytes": 2836,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 1,
+      "entryOffset": 40,
+      "expect": {
+        "read": 1
+      }
+    },
+    {
+      "file": "orient-64x48-420-02.jpg",
+      "bytes": 2836,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 2,
+      "entryOffset": 40,
+      "expect": {
+        "read": 2
+      }
+    },
+    {
+      "file": "orient-64x48-420-03.jpg",
+      "bytes": 2836,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 3,
+      "entryOffset": 40,
+      "expect": {
+        "read": 3
+      }
+    },
+    {
+      "file": "orient-64x48-420-04.jpg",
+      "bytes": 2836,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 4,
+      "entryOffset": 40,
+      "expect": {
+        "read": 4
+      }
+    },
+    {
+      "file": "orient-64x48-420-05.jpg",
+      "bytes": 2836,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 5,
+      "entryOffset": 40,
+      "expect": {
+        "read": 5
+      }
+    },
+    {
+      "file": "orient-64x48-420-06.jpg",
+      "bytes": 2836,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 6,
+      "entryOffset": 40,
+      "expect": {
+        "read": 6
+      }
+    },
+    {
+      "file": "orient-64x48-420-07.jpg",
+      "bytes": 2836,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 7,
+      "entryOffset": 40,
+      "expect": {
+        "read": 7
+      }
+    },
+    {
+      "file": "orient-64x48-420-08.jpg",
+      "bytes": 2836,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 8,
+      "entryOffset": 40,
+      "expect": {
+        "read": 8
+      }
+    },
+    {
+      "file": "orient-41x27-420-01.jpg",
+      "bytes": 1473,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 1,
+      "entryOffset": 40,
+      "expect": {
+        "read": 1
+      }
+    },
+    {
+      "file": "orient-41x27-420-02.jpg",
+      "bytes": 1473,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 2,
+      "entryOffset": 40,
+      "expect": {
+        "read": 2
+      }
+    },
+    {
+      "file": "orient-41x27-420-03.jpg",
+      "bytes": 1473,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 3,
+      "entryOffset": 40,
+      "expect": {
+        "read": 3
+      }
+    },
+    {
+      "file": "orient-41x27-420-04.jpg",
+      "bytes": 1473,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 4,
+      "entryOffset": 40,
+      "expect": {
+        "read": 4
+      }
+    },
+    {
+      "file": "orient-41x27-420-05.jpg",
+      "bytes": 1473,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 5,
+      "entryOffset": 40,
+      "expect": {
+        "read": 5
+      }
+    },
+    {
+      "file": "orient-41x27-420-06.jpg",
+      "bytes": 1473,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 6,
+      "entryOffset": 40,
+      "expect": {
+        "read": 6
+      }
+    },
+    {
+      "file": "orient-41x27-420-07.jpg",
+      "bytes": 1473,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 7,
+      "entryOffset": 40,
+      "expect": {
+        "read": 7
+      }
+    },
+    {
+      "file": "orient-41x27-420-08.jpg",
+      "bytes": 1473,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 8,
+      "entryOffset": 40,
+      "expect": {
+        "read": 8
+      }
+    },
+    {
+      "file": "orient-64x48-progressive-420-01.jpg",
+      "bytes": 2341,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 1,
+      "entryOffset": 40,
+      "expect": {
+        "read": 1
+      }
+    },
+    {
+      "file": "orient-64x48-progressive-420-02.jpg",
+      "bytes": 2341,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 2,
+      "entryOffset": 40,
+      "expect": {
+        "read": 2
+      }
+    },
+    {
+      "file": "orient-64x48-progressive-420-03.jpg",
+      "bytes": 2341,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 3,
+      "entryOffset": 40,
+      "expect": {
+        "read": 3
+      }
+    },
+    {
+      "file": "orient-64x48-progressive-420-04.jpg",
+      "bytes": 2341,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 4,
+      "entryOffset": 40,
+      "expect": {
+        "read": 4
+      }
+    },
+    {
+      "file": "orient-64x48-progressive-420-05.jpg",
+      "bytes": 2341,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 5,
+      "entryOffset": 40,
+      "expect": {
+        "read": 5
+      }
+    },
+    {
+      "file": "orient-64x48-progressive-420-06.jpg",
+      "bytes": 2341,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 6,
+      "entryOffset": 40,
+      "expect": {
+        "read": 6
+      }
+    },
+    {
+      "file": "orient-64x48-progressive-420-07.jpg",
+      "bytes": 2341,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 7,
+      "entryOffset": 40,
+      "expect": {
+        "read": 7
+      }
+    },
+    {
+      "file": "orient-64x48-progressive-420-08.jpg",
+      "bytes": 2341,
+      "kind": "orientation",
+      "byteOrder": "little",
+      "orientation": 8,
+      "entryOffset": 40,
+      "expect": {
+        "read": 8
+      }
+    },
+    {
+      "file": "insert-equal-ii-06.jpg",
+      "bytes": 362,
+      "kind": "writer-equality",
+      "byteOrder": "little",
+      "orientation": 6,
+      "entryOffset": 40,
+      "expect": {
+        "read": 6
+      }
+    },
+    {
+      "file": "exif-thumbnail-06.jpg",
+      "bytes": 8274,
+      "kind": "thumbnail",
+      "byteOrder": "little",
+      "orientation": 6,
+      "entryOffset": 52,
+      "comment": "little endian, Make in front of the thumbnail, thumbnail last (the usual layout)",
+      "expect": {
+        "read": 6
+      },
+      "thumbnail": {
+        "tiffOffset": 30,
+        "blockEnd": 5494,
+        "dataOffset": 106,
+        "dataLength": 5388,
+        "offsetEntryOffset": 78,
+        "lengthEntryOffset": 90,
+        "lengthFormat": 4,
+        "make": "TestCam",
+        "makeBehindThumbnail": false,
+        "payload": "jpeg"
+      }
+    },
+    {
+      "file": "exif-thumbnail-shifted-06.jpg",
+      "bytes": 8274,
+      "kind": "thumbnail",
+      "byteOrder": "little",
+      "orientation": 6,
+      "entryOffset": 52,
+      "comment": "little endian, Make stored behind the thumbnail: replacing it has to fix up that offset",
+      "expect": {
+        "read": 6
+      },
+      "thumbnail": {
+        "tiffOffset": 30,
+        "blockEnd": 5494,
+        "dataOffset": 98,
+        "dataLength": 5388,
+        "offsetEntryOffset": 78,
+        "lengthEntryOffset": 90,
+        "lengthFormat": 4,
+        "make": "TestCam",
+        "makeBehindThumbnail": true,
+        "payload": "jpeg"
+      }
+    },
+    {
+      "file": "exif-thumbnail-mm-06.jpg",
+      "bytes": 8274,
+      "kind": "thumbnail",
+      "byteOrder": "big",
+      "orientation": 6,
+      "entryOffset": 52,
+      "comment": "big endian, thumbnail length stored as SHORT instead of LONG",
+      "expect": {
+        "read": 6
+      },
+      "thumbnail": {
+        "tiffOffset": 30,
+        "blockEnd": 5494,
+        "dataOffset": 106,
+        "dataLength": 5388,
+        "offsetEntryOffset": 78,
+        "lengthEntryOffset": 90,
+        "lengthFormat": 3,
+        "make": "TestCam",
+        "makeBehindThumbnail": false,
+        "payload": "jpeg"
+      }
+    },
+    {
+      "file": "exif-thumbnail-own-exif-06.jpg",
+      "bytes": 8331,
+      "kind": "thumbnail",
+      "byteOrder": "little",
+      "orientation": 6,
+      "entryOffset": 52,
+      "comment": "the thumbnail carries its own Exif block with orientation 6 and its own Make tag",
+      "expect": {
+        "read": 6
+      },
+      "thumbnail": {
+        "tiffOffset": 30,
+        "blockEnd": 5551,
+        "dataOffset": 106,
+        "dataLength": 5445,
+        "offsetEntryOffset": 78,
+        "lengthEntryOffset": 90,
+        "lengthFormat": 4,
+        "make": "TestCam",
+        "makeBehindThumbnail": false,
+        "payload": "jpeg"
+      }
+    },
+    {
+      "file": "exif-thumbnail-progressive-06.jpg",
+      "bytes": 5315,
+      "kind": "thumbnail",
+      "byteOrder": "little",
+      "orientation": 6,
+      "entryOffset": 52,
+      "comment": "the thumbnail is progressive: it is re-encoded sequentially and that is reported",
+      "expect": {
+        "read": 6
+      },
+      "thumbnail": {
+        "tiffOffset": 30,
+        "blockEnd": 2535,
+        "dataOffset": 106,
+        "dataLength": 2429,
+        "offsetEntryOffset": 78,
+        "lengthEntryOffset": 90,
+        "lengthFormat": 4,
+        "make": "TestCam",
+        "makeBehindThumbnail": false,
+        "payload": "jpeg"
+      }
+    },
+    {
+      "file": "exif-thumbnail-imperfect-06.jpg",
+      "bytes": 4323,
+      "kind": "thumbnail",
+      "byteOrder": "little",
+      "orientation": 6,
+      "entryOffset": 52,
+      "comment": "the thumbnail is 41x27: its transform is not MCU aligned and that is reported",
+      "expect": {
+        "read": 6
+      },
+      "thumbnail": {
+        "tiffOffset": 30,
+        "blockEnd": 1543,
+        "dataOffset": 106,
+        "dataLength": 1437,
+        "offsetEntryOffset": 78,
+        "lengthEntryOffset": 90,
+        "lengthFormat": 4,
+        "make": "TestCam",
+        "makeBehindThumbnail": false,
+        "payload": "jpeg"
+      }
+    },
+    {
+      "file": "err-thumbnail-arithmetic-06.jpg",
+      "bytes": 4835,
+      "kind": "thumbnail",
+      "byteOrder": "little",
+      "orientation": 6,
+      "entryOffset": 52,
+      "comment": "the thumbnail is arithmetic coded (SOF9): rotating it raises E_UNSUPPORTED",
+      "expect": {
+        "read": 6
+      },
+      "thumbnail": {
+        "tiffOffset": 30,
+        "blockEnd": 2055,
+        "dataOffset": 106,
+        "dataLength": 1949,
+        "offsetEntryOffset": 78,
+        "lengthEntryOffset": 90,
+        "lengthFormat": 4,
+        "make": "TestCam",
+        "makeBehindThumbnail": false,
+        "payload": "jpeg"
+      },
+      "thumbnailError": "E_UNSUPPORTED"
+    },
+    {
+      "file": "err-thumbnail-not-jpeg-06.jpg",
+      "bytes": 2921,
+      "kind": "thumbnail",
+      "byteOrder": "little",
+      "orientation": 6,
+      "entryOffset": 52,
+      "comment": "the thumbnail data is not a JPEG at all: rotating it raises E_INVALID_EXIF",
+      "expect": {
+        "read": 6
+      },
+      "thumbnail": {
+        "tiffOffset": 30,
+        "blockEnd": 141,
+        "dataOffset": 106,
+        "dataLength": 35,
+        "offsetEntryOffset": 78,
+        "lengthEntryOffset": 90,
+        "lengthFormat": 4,
+        "make": "TestCam",
+        "makeBehindThumbnail": false,
+        "payload": "raw"
+      },
+      "thumbnailError": "E_INVALID_EXIF"
+    },
+    {
+      "file": "err-thumbnail-subifds-06.jpg",
+      "bytes": 8286,
+      "kind": "thumbnail",
+      "byteOrder": "little",
+      "orientation": 6,
+      "entryOffset": 52,
+      "comment": "the Exif block declares SubIFDs and the thumbnail is not the last thing in it",
+      "expect": {
+        "read": 6
+      },
+      "thumbnail": {
+        "tiffOffset": 30,
+        "blockEnd": 5506,
+        "dataOffset": 110,
+        "dataLength": 5388,
+        "offsetEntryOffset": 90,
+        "lengthEntryOffset": 102,
+        "lengthFormat": 4,
+        "make": "TestCam",
+        "makeBehindThumbnail": true,
+        "payload": "jpeg"
+      },
+      "thumbnailError": "E_INVALID_EXIF"
+    },
+    {
+      "file": "lenna.png",
+      "bytes": 473831,
+      "kind": "sample",
+      "mediaType": "image/png",
+      "comment": "hand-provided sample, not generated by this script"
+    },
+    {
+      "file": "lenna.jpg",
+      "bytes": 106738,
+      "kind": "sample",
+      "mediaType": "image/jpeg",
+      "comment": "hand-provided sample, not generated by this script"
+    },
+    {
+      "file": "lenna.webp",
+      "bytes": 22942,
+      "kind": "sample",
+      "mediaType": "image/webp",
+      "comment": "hand-provided sample, not generated by this script"
+    }
+  ],
+  "baseSegments": {
+    "jfif": "/+AAEEpGSUYAAQEBAEgASAAA",
+    "tail": "/9oADAMBAAIRAxEAPwCXkfISbmNE3MbdwrpY/AAB31rkq8stsHRvEP/Z"
+  }
+}

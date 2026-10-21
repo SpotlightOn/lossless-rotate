@@ -1,0 +1,64 @@
+{
+  "name": "@spotlighton/lossless-rotate",
+  "version": "0.6.0",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SpotlightOn/lossless-rotate.git"
+  },
+  "description": "Make JPEGs upright: read and write the EXIF orientation tag and rotate JPEGs losslessly in the DCT domain.",
+  "author": {
+    "name": "Your Name",
+    "email": "you@example.com"
+  },
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">= 24.0.0"
+  },
+  "keywords": [
+    "jpeg",
+    "jpg",
+    "exif",
+    "orientation",
+    "autorotate",
+    "auto-rotate",
+    "rotate",
+    "lossless",
+    "jpegtran",
+    "dct"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./exif": "./src/exif.ts",
+    "./orientation": "./src/orientation.ts"
+  },
+  "bin": {
+    "lossless-rotate": "./bin/lossless-rotate.ts"
+  },
+  "files": [
+    "src",
+    "bin",
+    "README.md",
+    "CHANGELOG.md",
+    "DESIGN.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "test:watch": "node --test --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "fixtures": "node scripts/make-fixtures.mjs"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2"
+  }
+}
