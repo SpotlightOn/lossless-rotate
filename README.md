@@ -1,5 +1,10 @@
 # @spotlighton/lossless-rotate
 
+[![CI](https://github.com/SpotlightOn/lossless-rotate/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SpotlightOn/lossless-rotate/actions/workflows/ci.yml)
+[![Socket](https://github.com/SpotlightOn/lossless-rotate/actions/workflows/socket.yml/badge.svg?branch=main)](https://github.com/SpotlightOn/lossless-rotate/actions/workflows/socket.yml)
+[![Node](https://img.shields.io/badge/node-%E2%89%A524-brightgreen)](https://nodejs.org)
+[![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
+
 Make JPEGs upright — in the DCT domain, so **not a single pixel is re-encoded**.
 
 This is a pure TypeScript version of `jpegtran`. There is also a WASM version, which is better tested:
