@@ -1,11 +1,11 @@
 /**
- * @spotlighton/lossless-rotate - make JPEGs upright, and read/write the orientation of AVIF.
+ * @chimok/lossless-rotate - make JPEGs upright, and read/write the orientation of AVIF.
  *
  * Read and write the orientation of JPEG (Exif tag) and AVIF (`irot`/`imir` property), and rotate
  * JPEG images losslessly in the DCT domain: no dequantization, no requantization, no quality loss.
  * Zero dependencies.
  *
- *   import { autoRotate, orientation } from "@spotlighton/lossless-rotate";
+ *   import { autoRotate, orientation } from "@chimok/lossless-rotate";
  *
  *   await orientation("IMG_0001.jpg");                 // -> 6
  *   await orientation("IMG_0001.jpg", 1);              // metadata only, lossless

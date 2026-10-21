@@ -18,23 +18,29 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: pnpm/action-setup@v6
+      # pnpm 12 is a self-contained binary that installs runtimes itself, so it needs pnpm/setup,
+      # not pnpm/action-setup (which went through npm and cannot install pnpm 12). The action reads
+      # the pnpm version from package.json's `packageManager`, installs Node.js, caches the store
+      # and runs the frozen install; a stale lockfile fails here instead of later.
+      - uses: pnpm/setup@v3
         with:
-          version: 12
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          runtime: node@24
+          cache: true
+          require-lockfile: true
 
       - name: Lint (Biome)
         run: pnpm run lint
 
       - name: Type check
         run: pnpm run typecheck
+
+      - name: Build
+        run: pnpm run build
+
+      # Packs the tarball and imports it from a throwaway node_modules: a broken exports/files/bin
+      # setup only shows up for consumers, never for the source tests.
+      - name: Verify the published package
+        run: pnpm run verify:package
 
   test:
     name: Node ${{ matrix.node }} on ${{ matrix.os }}
@@ -50,17 +56,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: pnpm/action-setup@v6
+      # See the lint job: pnpm 12 requires pnpm/setup, which installs this matrix's Node.js too.
+      - uses: pnpm/setup@v3
         with:
-          version: 12
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: ${{ matrix.node }}
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          runtime: node@${{ matrix.node }}
+          cache: true
+          require-lockfile: true
 
       # jpegtran/djpeg turn the differential tests on. They are optional; the suite skips them
       # wherever they are missing, so runners without them only exercise the pure-JS path.

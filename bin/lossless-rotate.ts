@@ -11,7 +11,8 @@
  */
 
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { basename, extname, join, resolve } from "node:path";
+import { basename, dirname, extname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
 import {
@@ -38,6 +39,27 @@ import {
   transformForRotation,
   transformJpeg,
 } from "../src/index.ts";
+
+/**
+ * The manifest is read at run time so `--version` cannot drift from package.json. The file lives at
+ * the package root, but this module sits in `bin/` when run from source and in `dist/bin/` when
+ * installed, so the root is found by walking up until the manifest appears.
+ */
+function readManifest(): { name: string; version: string } {
+  let directory = dirname(fileURLToPath(import.meta.url));
+  for (;;) {
+    const candidate = join(directory, "package.json");
+    try {
+      return JSON.parse(readFileSync(candidate, "utf8"));
+    } catch {
+      const parent = dirname(directory);
+      if (parent === directory) throw new Error("package.json not found above the CLI");
+      directory = parent;
+    }
+  }
+}
+
+const manifest = readManifest();
 
 /** Where results land when the caller does not say where: easy to look at, easy to delete. */
 const DEFAULT_OUTPUT_DIR = "tmp";
@@ -433,9 +455,6 @@ function main(): number {
   });
 
   if (values.version === true) {
-    const manifest: { name: string; version: string } = JSON.parse(
-      readFileSync(new URL("../package.json", import.meta.url), "utf8"),
-    );
     process.stdout.write(`${manifest.name} ${manifest.version}\n`);
     return 0;
   }

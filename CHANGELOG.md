@@ -27,7 +27,7 @@ re-encoding.
 - **Public API**: `orientation`, `setOrientation`, `canTransform`, `transformJpeg`, `parseJpeg`,
   `decodeCoefficients`, `frameGeometry`, `isPerfectTransform`, `transformForRotation`,
   `composeTransforms`, the Exif/TIFF helpers, and the AVIF layer under
-  `@spotlighton/lossless-rotate/avif`.
+  `@chimok/lossless-rotate/avif`.
 - `OrientError` with stable string codes, a fixture generator, and differential tests against
   `jpegtran`, `avifenc` and `avifdec`.
 

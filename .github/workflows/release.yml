@@ -12,35 +12,25 @@ env:
 
 permissions:
   contents: write # create the GitHub release
-  packages: write # publish to GitHub Packages
 
 jobs:
   publish:
     name: Publish
     runs-on: ubuntu-latest
     env:
-      # Optional. When the secret is missing, the public npm registry step is skipped and the
-      # package is only published to GitHub Packages.
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - uses: pnpm/action-setup@v6
+      # pnpm 12 requires pnpm/setup; it installs pnpm (from `packageManager`), Node.js and the
+      # dependencies in one step.
+      - uses: pnpm/setup@v3
         with:
-          version: 12
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: ${{ env.NODE }}
-          cache: pnpm
-          # Writes the GitHub Packages registry and an NODE_AUTH_TOKEN into the npm config,
-          # which is what `npm publish` (via publishConfig) picks up.
-          registry-url: https://npm.pkg.github.com
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          runtime: node@${{ env.NODE }}
+          cache: true
+          require-lockfile: true
 
       - name: Verify the tag matches package.json
         run: |
@@ -57,22 +47,19 @@ jobs:
           pnpm run typecheck
           pnpm test
 
-      - name: Publish to GitHub Packages
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ github.token }}
+      - name: Build
+        run: pnpm run build
 
-      # The public npm registry is optional: it needs an NPM_TOKEN secret, and the @scope has to be
-      # owned on npmjs. GitHub Packages above is the primary target, so a failure here - a scope that
-      # does not exist yet, or a token without publish rights - must not fail the run and hide the
-      # release that has already been published.
+      - name: Verify the published package
+        run: pnpm run verify:package
+
+      # The package is scoped to the npm account (@chimok), so npmjs is the registry; GitHub Packages
+      # would require the scope to match the repository owner instead.
       - name: Publish to npm
-        if: env.NPM_TOKEN != ''
-        continue-on-error: true
         run: |
           NPMRC="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
-          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> "$NPMRC"
-          npm publish --registry=https://registry.npmjs.org --access public
+          printf '\n//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" >> "$NPMRC"
+          npm publish --access public
 
       - name: Create GitHub release
         env:

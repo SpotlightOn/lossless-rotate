@@ -1,24 +1,29 @@
 {
-  "name": "@spotlighton/lossless-rotate",
+  "name": "@chimok/lossless-rotate",
   "version": "0.6.0",
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com",
     "access": "public"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/SpotlightOn/lossless-rotate.git"
   },
+  "homepage": "https://github.com/SpotlightOn/lossless-rotate#readme",
+  "bugs": {
+    "url": "https://github.com/SpotlightOn/lossless-rotate/issues"
+  },
   "description": "Make JPEGs upright: read and write the EXIF orientation tag, rotate JPEGs losslessly in the DCT domain, and handle the orientation of AVIF.",
   "author": {
-    "name": "Your Name",
-    "email": "you@example.com"
+    "name": "SpotlightOn",
+    "url": "https://github.com/SpotlightOn"
   },
   "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">= 24.0.0"
   },
+  "packageManager": "pnpm@12.11.2",
+  "sideEffects": false,
   "keywords": [
     "jpeg",
     "jpg",
@@ -35,18 +40,32 @@
     "irot",
     "imir"
   ],
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./exif": "./src/exif.ts",
-    "./orientation": "./src/orientation.ts",
-    "./avif": "./src/avif/orientation.ts"
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./exif": {
+      "types": "./dist/src/exif.d.ts",
+      "default": "./dist/src/exif.js"
+    },
+    "./orientation": {
+      "types": "./dist/src/orientation.d.ts",
+      "default": "./dist/src/orientation.js"
+    },
+    "./avif": {
+      "types": "./dist/src/avif/orientation.d.ts",
+      "default": "./dist/src/avif/orientation.js"
+    },
+    "./package.json": "./package.json"
   },
   "bin": {
-    "lossless-rotate": "./bin/lossless-rotate.ts"
+    "lossless-rotate": "./dist/bin/lossless-rotate.js"
   },
   "files": [
-    "src",
-    "bin",
+    "dist",
     "README.md",
     "CHANGELOG.md",
     "DESIGN.md",
@@ -59,7 +78,10 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "fixtures": "node scripts/make-fixtures.mjs"
+    "fixtures": "node scripts/make-fixtures.mjs",
+    "build": "tsc -p tsconfig.build.json",
+    "verify:package": "node scripts/verify-package.mjs",
+    "prepublishOnly": "npm run typecheck && npm run lint && npm test && npm run build && npm run verify:package"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",

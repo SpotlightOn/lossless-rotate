@@ -1,4 +1,4 @@
-# Design of `@spotlighton/lossless-rotate`
+# Design of `@chimok/lossless-rotate`
 
 `lossless-rotate` makes JPEG images upright without re-encoding them. It reads and writes the Exif
 orientation tag and rotates the image by rearranging quantized DCT coefficients — no IDCT, no
@@ -17,7 +17,7 @@ Decisions taken with the maintainer:
 
 * rotation must be **lossless**;
 * **no native code**: no C/C++ addon, no `sharp`, no prebuilt binary, no compiler step;
-* **TypeScript**, shipped as source and executed through Node's native type stripping (no build);
+* **TypeScript**, published as compiled ESM plus `.d.ts` (Node does not strip types under `node_modules`), and runnable straight from source in the repository;
 * **zero runtime dependencies**;
 * **orientation handling stays at the metadata/Exif level** — for formats without a coefficient-domain
   rotation (AVIF) the properties are changed, the pixels are not;
@@ -93,7 +93,7 @@ buffers.
   the offset fixup that replacing it requires.
 * `isAvif`, `avifLayout`, `avifImageSize`, `avifPropertyTypes`, `readAvifOrientation`,
   `writeAvifOrientation`, `setAvifOrientation` — the AVIF metadata layer (also reachable as
-  `@spotlighton/lossless-rotate/avif`).
+  `@chimok/lossless-rotate/avif`).
 * `transformJpeg`, `parseJpeg`, `decodeCoefficients`, `frameGeometry`, `isPerfectTransform` — the
   layers below.
 

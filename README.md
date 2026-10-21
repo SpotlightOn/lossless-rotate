@@ -1,4 +1,4 @@
-# @spotlighton/lossless-rotate
+# @chimok/lossless-rotate
 
 [![CI](https://github.com/SpotlightOn/lossless-rotate/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SpotlightOn/lossless-rotate/actions/workflows/ci.yml)
 [![Socket](https://github.com/SpotlightOn/lossless-rotate/actions/workflows/socket.yml/badge.svg?branch=main)](https://github.com/SpotlightOn/lossless-rotate/actions/workflows/socket.yml)
@@ -24,7 +24,7 @@ properties of its primary item. AV1 has no lossless rotation, so `orientation()`
 properties (rebuilding the property set and repairing the `iloc` extents, image data untouched) and
 `autoRotate` refuses an AVIF as well. See [AVIF](#avif).
 
-- **Pure TypeScript**, shipped as source and run directly by Node (native type stripping).
+- **Pure TypeScript**, published as plain ESM plus type declarations, compiled from source at pack time.
 - **Zero runtime dependencies.** No `sharp`, no `gm`, no `jpegtran`, no C/C++ addon, no compiler step.
 - **Lossless by construction.** The transform operates on the entropy-coded coefficients; decoding a
   transformed file and decoding a rotated copy of the original agree exactly (verified against
@@ -39,13 +39,13 @@ properties (rebuilding the property set and repairing the `iloc` extents, image 
 
 ## Requirements
 
-- **Node.js ≥ 24** (the package ships `.ts` files and relies on native type stripping).
-- ESM. From CommonJS, `require("@spotlighton/lossless-rotate")` works on Node ≥ 22.12 via `require(esm)`.
+- **Node.js ≥ 24**.
+- ESM. From CommonJS, `require("@chimok/lossless-rotate")` works on Node ≥ 22.12 via `require(esm)`.
 
 ## Install
 
 ```sh
-npm install @spotlighton/lossless-rotate
+npm install @chimok/lossless-rotate
 ```
 
 ## Usage
@@ -55,7 +55,7 @@ npm install @spotlighton/lossless-rotate
 Setting the tag only rewrites ten bytes of the Exif IFD — the image data is untouched.
 
 ```js
-import { orientation } from "@spotlighton/lossless-rotate";
+import { orientation } from "@chimok/lossless-rotate";
 
 await orientation("IMG_0001.jpg");        // -> 6 (0 when there is no tag)
 await orientation("IMG_0001.jpg", 1);     // metadata only, still lossless
@@ -70,7 +70,7 @@ orientation("IMG_0001.jpg", (error, value) => { /* ... */ });
 ### Make an image upright
 
 ```js
-import { autoRotate } from "@spotlighton/lossless-rotate";
+import { autoRotate } from "@chimok/lossless-rotate";
 
 const result = await autoRotate("IMG_0001.jpg", "upright.jpg");
 // result.orientation -> 6        (the value that was stored in the source)
@@ -83,14 +83,14 @@ const result = await autoRotate("IMG_0001.jpg", "upright.jpg");
 Without a destination you get the bytes back instead of writing a file:
 
 ```js
-import { autoRotate } from "@spotlighton/lossless-rotate";
+import { autoRotate } from "@chimok/lossless-rotate";
 const { bytes } = await autoRotate("IMG_0001.jpg");
 ```
 
 Or work purely on buffers:
 
 ```js
-import { autoRotateBuffer, setOrientation, canTransform } from "@spotlighton/lossless-rotate";
+import { autoRotateBuffer, setOrientation, canTransform } from "@chimok/lossless-rotate";
 
 const { result, bytes } = autoRotateBuffer(source);
 const tagged = setOrientation(source, 6);   // insert/patch the tag, no rotation
@@ -104,7 +104,7 @@ An AVIF still image is one ISOBMFF *item*. Its orientation is not a tag in a met
 detects the container from the `ftyp` box and works the same way:
 
 ```js
-import { orientation, autoRotate, canTransform, setOrientation } from "@spotlighton/lossless-rotate";
+import { orientation, autoRotate, canTransform, setOrientation } from "@chimok/lossless-rotate";
 
 await orientation("photo.avif");        // -> 6, from the irot/imir properties (0 when there are none)
 await orientation("photo.avif", 1);     // writes irot 0 explicitly, the image data is untouched
@@ -292,7 +292,7 @@ Every failure is an `OrientError` with a stable `code`:
 The transformer and the parsing layers are exported for callers that want to build on them:
 
 ```js
-import { transformJpeg, parseJpeg, decodeCoefficients, frameGeometry, isPerfectTransform } from "@spotlighton/lossless-rotate";
+import { transformJpeg, parseJpeg, decodeCoefficients, frameGeometry, isPerfectTransform } from "@chimok/lossless-rotate";
 ```
 
 `transformJpeg(bytes, { primitive })` applies one primitive (`flipHorizontal`, `flipVertical`,
@@ -309,10 +309,10 @@ import {
   buildExifTiff,               // (value) -> a bare TIFF block
   locateExifThumbnail,         // (buffer, tiffOffset, end) -> ExifThumbnail | null
   replaceExifThumbnail,        // (buffer, tiffOffset, end, thumbnail, data) -> the new Exif block
-} from "@spotlighton/lossless-rotate";
+} from "@chimok/lossless-rotate";
 ```
 
-AVIF-specific entry points live under `@spotlighton/lossless-rotate/avif` and are also exported from
+AVIF-specific entry points live under `@chimok/lossless-rotate/avif` and are also exported from
 the root:
 
 ```js
@@ -321,7 +321,7 @@ import {
   readAvifOrientation,
   writeAvifOrientation,                                   // rebuild meta, fix up iloc
   setAvifOrientation,                                     // Buffer in, Buffer out
-} from "@spotlighton/lossless-rotate";
+} from "@chimok/lossless-rotate";
 ```
 
 `isAvifSequence` is true for an AVIF *image sequence* (`avis`, track based, no item properties), which the
@@ -348,6 +348,7 @@ See `DESIGN.md` for the full behaviour table and the verification evidence.
 ## Development
 
 ```sh
+pnpm build          # tsc -p tsconfig.build.json -> dist/
 pnpm test           # node --test  (118 tests)
 pnpm run typecheck  # tsc --noEmit
 pnpm run lint       # biome check .
@@ -360,11 +361,13 @@ format-specific suites, and `test/fixtures/` is the corpus both read.
 
 Linting and formatting use [Biome](https://biomejs.dev); the configuration is in `biome.json`.
 
-Node's native type stripping **erases** types, it does not check them, so `typescript` is a
-devDependency for `pnpm run typecheck` (`tsc --noEmit`) only — nothing is ever compiled or emitted, and
-consumers do not install it. `tsconfig.json` sets `erasableSyntaxOnly`, which makes `tsc` reject any
-syntax Node could not strip (enums, parameter properties, …), so "type checks" and "runs on Node" stay
-the same thing.
+The published package is built with `pnpm run build` (`tsc -p tsconfig.build.json`) into `dist/`:
+JavaScript plus `.d.ts`, with the relative `.ts` import specifiers rewritten to `.js`. Shipping the
+TypeScript sources directly is not an option, because Node refuses to strip types for files under
+`node_modules` (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`). `typescript` is a devDependency; consumers
+never install it. `tsconfig.json` sets `erasableSyntaxOnly`, so enums and parameter properties stay
+out even though the build would compile them - the source keeps running directly under Node when you
+work in the repository, without a build step.
 
 The differential tests compare against `jpegtran`/`djpeg` and for AVIF against `avifenc`/`avifdec` and
 ImageMagick; the fixture generator additionally uses GraphicsMagick (`gm`) and `cjpeg`. All of them skip
@@ -374,6 +377,10 @@ corpus:
 ```sh
 pnpm run fixtures  # needs gm, cjpeg, jpegtran
 ```
+
+`pnpm run verify:package` packs the tarball, unpacks it into a throwaway `node_modules` and imports it
+from there, which is the only way to catch a broken `exports`/`files`/`bin` setup: Node refuses to
+strip types under `node_modules`, so a mistake there only shows up for consumers.
 
 ## Releasing
 
@@ -385,20 +392,12 @@ npm version patch   # or minor / major; commits and tags vX.Y.Z
 git push --follow-tags
 ```
 
-The workflow checks that the tag matches `package.json`, runs lint, type check and tests, publishes to
-**GitHub Packages** as `@spotlighton/lossless-rotate` (this needs only the built-in `GITHUB_TOKEN`),
-and creates a GitHub release from the matching `CHANGELOG.md` section. Publishing to the public npmjs
-registry is optional and only runs when an `NPM_TOKEN` secret is set — for that, the `@spotlighton`
-scope has to be owned on npmjs.
+The workflow checks that the tag matches `package.json`, runs lint, type check and tests, publishes
+`@chimok/lossless-rotate` to npmjs (it needs the `NPM_TOKEN` secret) and creates a GitHub release from
+the matching `CHANGELOG.md` section.
 
-Installing from GitHub Packages needs an authenticated npm client:
-
-```sh
-# ~/.npmrc
-# @spotlighton:registry=https://npm.pkg.github.com
-# //npm.pkg.github.com/:_authToken=<your-token>
-npm install @spotlighton/lossless-rotate
-```
+The scope is the npm account: npmjs only accepts `@chimok`, and GitHub Packages would only accept the
+repository owner's scope instead, so there is no single name that could be published to both.
 
 ## Roadmap
 
