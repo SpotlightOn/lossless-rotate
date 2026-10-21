@@ -62,10 +62,13 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ github.token }}
 
-      # The public npm registry is optional: it needs an NPM_TOKEN secret, and the @scope must be
-      # owned on npmjs. GitHub Packages above is the primary target.
+      # The public npm registry is optional: it needs an NPM_TOKEN secret, and the @scope has to be
+      # owned on npmjs. GitHub Packages above is the primary target, so a failure here - a scope that
+      # does not exist yet, or a token without publish rights - must not fail the run and hide the
+      # release that has already been published.
       - name: Publish to npm
         if: env.NPM_TOKEN != ''
+        continue-on-error: true
         run: |
           NPMRC="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
           echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> "$NPMRC"
