@@ -19,13 +19,17 @@ re-encoding.
   sequential JPEGs, still coefficient-exact.
 - **The embedded Exif thumbnail** can be rotated with the image (`rotateThumbnail: true`), using the
   same code, with the thumbnail's length tag and the offsets behind it fixed up afterwards.
+- **AVIF orientation.** The `irot`/`imir` properties of the primary item are read and written; a write
+  rebuilds the property set and shifts the `iloc` extents, so the image data is copied byte for byte.
+  `autoRotate` refuses AVIF with `E_UNSUPPORTED`, because AV1 has no coefficient-domain rotation.
 - **A CLI**: `lossless-rotate info|rotate|set|thumbnail`, with `--rotate`, `--thumbnail`, `--strict`,
   `--drop-metadata`, `--json` and `-o/--output`. Results go to a git-ignored `tmp/` by default.
 - **Public API**: `orientation`, `setOrientation`, `canTransform`, `transformJpeg`, `parseJpeg`,
   `decodeCoefficients`, `frameGeometry`, `isPerfectTransform`, `transformForRotation`,
-  `composeTransforms`, and the Exif/TIFF helpers.
+  `composeTransforms`, the Exif/TIFF helpers, and the AVIF layer under
+  `@spotlighton/lossless-rotate/avif`.
 - `OrientError` with stable string codes, a fixture generator, and differential tests against
-  `jpegtran`.
+  `jpegtran`, `avifenc` and `avifdec`.
 
 ### Notes
 

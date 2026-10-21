@@ -4,9 +4,15 @@
  * The whole point of this package is that the rotation happens in the DCT domain, so it neither
  * dequantizes nor requantizes anything. `autoRotate` is a thin orchestration on top of the codec:
  * read the orientation, look up the transform, apply it, write the result with orientation 1.
+ *
+ * AVIF is a different story and this module says so instead of pretending: AV1 has no
+ * coefficient-domain rotation, so `autoRotate` refuses it with `E_UNSUPPORTED` and points at the
+ * `irot`/`imir` property, which is the lossless way to make the image appear upright.
  */
 
 import { readFile, writeFile } from "node:fs/promises";
+import { isAvif } from "./avif/container.ts";
+import { setAvifOrientation } from "./avif/orientation.ts";
 import { cantOpenCause, OrientError } from "./errors.ts";
 import { insertOrientation, readOrientation } from "./exif.ts";
 import { transformJpeg } from "./jpeg/codec.ts";
@@ -58,6 +64,14 @@ export function autoRotateBuffer(
   bytes: Uint8Array,
   options: AutoRotateOptions = {},
 ): { result: AutoRotateResult; bytes: Buffer } {
+  if (isAvif(bytes)) {
+    throw new OrientError(
+      "E_UNSUPPORTED",
+      "unsupported AVIF: the AV1 bitstream cannot be rotated without re-encoding, so the irot/imir " +
+        "property is the lossless way to make an AVIF appear upright (see setOrientation/orientation)",
+    );
+  }
+
   const orientation = readOrientation(bytes);
 
   if (orientation === 0 || isIdentity(transformFor(orientation))) {
@@ -128,18 +142,24 @@ export async function autoRotate(
 }
 
 /**
- * Writes an orientation value into a JPEG buffer without touching the image data.
+ * Writes an orientation value into a JPEG or AVIF buffer without touching the image data.
  *
- * A JPEG without an Exif block gets a minimal one (`insertOrientation`).
+ * A JPEG without an Exif block gets a minimal one (`insertOrientation`). An AVIF gets an
+ * `irot`/`imir` property (`setAvifOrientation`), which is a rebuild of `meta` with the `iloc` extents
+ * fixed up; the image data is copied byte for byte.
  */
 export function setOrientation(bytes: Uint8Array, value: number): Buffer {
+  if (isAvif(bytes)) return setAvifOrientation(bytes, value);
   return insertOrientation(bytes, value);
 }
 
 /**
  * True when the buffer is a JPEG that this package can transform.
+ *
+ * Always false for AVIF: the container is understood, the pixels are not re-encodable losslessly.
  */
 export function canTransform(bytes: Uint8Array): boolean {
+  if (isAvif(bytes)) return false;
   try {
     transformJpeg(bytes, { primitive: "none" });
     return true;

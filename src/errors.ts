@@ -16,9 +16,11 @@ export type ErrorCode =
   | "E_INVALID_EXIF"
   /** The JPEG structure (markers, tables, entropy data) is broken. */
   | "E_INVALID_JPEG"
+  /** The AVIF structure (ISOBMFF box tree, item properties) is broken. */
+  | "E_INVALID_AVIF"
   /** An argument was out of range, e.g. an orientation outside 1..8. */
   | "E_INVALID_VALUE"
-  /** The input is not a JPEG image. */
+  /** The input is neither a JPEG nor an AVIF image. */
   | "E_UNSUPPORTED_FORMAT"
   /** The file uses a feature this package cannot handle losslessly. */
   | "E_UNSUPPORTED";

@@ -7,40 +7,15 @@
  */
 
 import assert from "node:assert/strict";
-import { type ExecFileSyncOptionsWithStringEncoding, execFileSync } from "node:child_process";
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { type TestContext, test } from "node:test";
-import { fileURLToPath } from "node:url";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { test } from "node:test";
 
-const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const cli = join(root, "bin", "lossless-rotate.ts");
-const fixtures = join(root, "test", "fixtures");
-const packageJson: { name: string; version: string } = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+import { fixturesDir, packageRoot, run, scratch } from "../core/helpers.ts";
 
-/**
- * A scratch directory to run the CLI in. Its own `tmp/` is the CLI's default output directory, which
- * keeps the package clean and makes the "writes into tmp/" behaviour testable at the same time.
- */
-function scratch(t: TestContext): string {
-  const directory = mkdtempSync(join(tmpdir(), "lossless-rotate-cli-"));
-  t.after(() => rmSync(directory, { recursive: true, force: true }));
-  return directory;
-}
-
-/** Runs the CLI in `cwd` and reports the exit status instead of throwing. */
-function run(args: string[], cwd: string): { stdout: string; stderr: string; status: number } {
-  // `stdio` is explicit: `execFileSync` otherwise echoes the child's stderr to the parent's stderr,
-  // which would print the CLI's own error messages (and usage) into the test output.
-  const options: ExecFileSyncOptionsWithStringEncoding = { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
-  try {
-    return { stdout: execFileSync(process.execPath, [cli, ...args], options), stderr: "", status: 0 };
-  } catch (error) {
-    const failed = error as { status?: number; stdout?: string; stderr?: string };
-    return { stdout: failed.stdout ?? "", stderr: failed.stderr ?? "", status: failed.status ?? 1 };
-  }
-}
+const packageJson: { name: string; version: string } = JSON.parse(
+  readFileSync(join(packageRoot, "package.json"), "utf8"),
+);
 
 test("--version and --help work without a command, and no command is an error", (t) => {
   const space = scratch(t);
@@ -63,7 +38,7 @@ test("--version and --help work without a command, and no command is an error", 
 
 test("info reports the orientation and the thumbnail of a JPEG, and says so in JSON", (t) => {
   const space = scratch(t);
-  const file = join(fixtures, "exif-thumbnail-06.jpg");
+  const file = join(fixturesDir, "exif-thumbnail-06.jpg");
   const text = run(["info", file], space);
   assert.equal(text.status, 0);
   assert.match(text.stdout, /orientation\s+6 \(RightTop\)/);
@@ -80,17 +55,17 @@ test("info reports the orientation and the thumbnail of a JPEG, and says so in J
   assert.equal(parsed.thumbnail.transformable, true);
 });
 
-test("info on something that is not a JPEG says so instead of failing", (t) => {
+test("info on something that is not a JPEG or AVIF says so instead of failing", (t) => {
   const space = scratch(t);
-  const text = run(["info", join(fixtures, "lenna.png")], space);
+  const text = run(["info", join(fixturesDir, "lenna.png")], space);
   assert.equal(text.status, 0);
   assert.match(text.stdout, /format\s+unknown/);
-  assert.match(text.stdout, /not a JPEG/);
+  assert.match(text.stdout, /not a JPEG or AVIF/);
 });
 
 test("rotate writes into tmp/ by default and never touches the input", (t) => {
   const space = scratch(t);
-  const file = join(fixtures, "exif-thumbnail-06.jpg");
+  const file = join(fixturesDir, "exif-thumbnail-06.jpg");
   const before = readFileSync(file);
 
   const rotated = run(["rotate", file], space);
@@ -107,12 +82,12 @@ test("rotate writes into tmp/ by default and never touches the input", (t) => {
 
 test("rotate --thumbnail reports the thumbnail, and an upright image is not written at all", (t) => {
   const space = scratch(t);
-  const withThumbnail = run(["rotate", join(fixtures, "exif-thumbnail-06.jpg"), "--thumbnail"], space);
+  const withThumbnail = run(["rotate", join(fixturesDir, "exif-thumbnail-06.jpg"), "--thumbnail"], space);
   assert.equal(withThumbnail.status, 0);
   assert.match(withThumbnail.stdout, /thumbnail rotated/);
 
   const before = readdirSync(join(space, "tmp"));
-  const upright = run(["rotate", join(fixtures, "lenna.jpg")], space);
+  const upright = run(["rotate", join(fixturesDir, "lenna.jpg")], space);
   assert.equal(upright.status, 0);
   assert.match(upright.stdout, /already upright, nothing written/);
   assert.deepEqual(readdirSync(join(space, "tmp")), before, "nothing new is written for an upright image");
@@ -120,7 +95,7 @@ test("rotate --thumbnail reports the thumbnail, and an upright image is not writ
 
 test("rotate -o writes where it is told, also into a directory", (t) => {
   const space = scratch(t);
-  const file = join(fixtures, "exif-thumbnail-06.jpg");
+  const file = join(fixturesDir, "exif-thumbnail-06.jpg");
   const explicit = run(["rotate", file, "-o", "chosen.jpg"], space);
   assert.equal(explicit.status, 0);
   assert.deepEqual(readdirSync(space), ["chosen.jpg"]);
@@ -133,7 +108,7 @@ test("rotate -o writes where it is told, also into a directory", (t) => {
 
 test("rotate refuses what the library refuses, and says why", (t) => {
   const space = scratch(t);
-  const broken = run(["rotate", join(fixtures, "err-thumbnail-arithmetic-06.jpg"), "--thumbnail"], space);
+  const broken = run(["rotate", join(fixturesDir, "err-thumbnail-arithmetic-06.jpg"), "--thumbnail"], space);
   assert.equal(broken.status, 1);
   assert.match(broken.stderr, /^E_UNSUPPORTED: unsupported Exif thumbnail/);
 
@@ -145,7 +120,7 @@ test("rotate refuses what the library refuses, and says why", (t) => {
 
 test("thumbnail extracts the embedded JPEG, and reports when there is none", (t) => {
   const space = scratch(t);
-  const extracted = run(["thumbnail", join(fixtures, "exif-thumbnail-own-exif-06.jpg")], space);
+  const extracted = run(["thumbnail", join(fixturesDir, "exif-thumbnail-own-exif-06.jpg")], space);
   assert.equal(extracted.status, 0);
   const output = join(space, "tmp", "exif-thumbnail-own-exif-06.thumbnail.jpg");
   const data = readFileSync(output);
@@ -153,7 +128,7 @@ test("thumbnail extracts the embedded JPEG, and reports when there is none", (t)
   assert.equal(data[1], 0xd8);
   assert.match(extracted.stdout, new RegExp(`${data.length} bytes`));
 
-  const none = run(["thumbnail", join(fixtures, "lenna.jpg")], space);
+  const none = run(["thumbnail", join(fixturesDir, "lenna.jpg")], space);
   assert.equal(none.status, 1);
   assert.match(none.stderr, /no embedded Exif thumbnail/);
 });
@@ -167,7 +142,7 @@ test("--rotate turns the image by a fixed angle on top of the stored tag", (t) =
     ["03", "rotate270"],
     ["06", "rotate180"],
   ] as const) {
-    const file = join(fixtures, `orient-64x48-420-${tag}.jpg`);
+    const file = join(fixturesDir, `orient-64x48-420-${tag}.jpg`);
     const result = run(["rotate", file, "--rotate", "90", "-o", `${tag}.jpg`], space);
     assert.equal(result.status, 0);
     assert.match(result.stdout, new RegExp(`\\(${expected}, orientation [0-9] => 1\\)`));
@@ -175,12 +150,12 @@ test("--rotate turns the image by a fixed angle on top of the stored tag", (t) =
   }
 
   // tag 3 plus 180 is the identity: the image is already the way it was asked to be.
-  const identity = run(["rotate", join(fixtures, "orient-64x48-420-03.jpg"), "--rotate", "180"], space);
+  const identity = run(["rotate", join(fixturesDir, "orient-64x48-420-03.jpg"), "--rotate", "180"], space);
   assert.equal(identity.status, 0);
   assert.match(identity.stdout, /already in that orientation, nothing written/);
 
   // A file without an orientation tag gets its pixels turned, and no tag is invented for it.
-  const noTag = run(["rotate", join(fixtures, "no-exif.jpg"), "--rotate", "270", "-o", "t.jpg"], space);
+  const noTag = run(["rotate", join(fixturesDir, "no-exif.jpg"), "--rotate", "270", "-o", "t.jpg"], space);
   assert.equal(noTag.status, 0);
   assert.match(noTag.stdout, /\(rotate270, no orientation tag/);
   assert.match(run(["info", join(space, "t.jpg")], space).stdout, /orientation\s+0 \(no tag\)/);
@@ -188,7 +163,7 @@ test("--rotate turns the image by a fixed angle on top of the stored tag", (t) =
 
 test("--rotate rejects angles that are not a quarter turn", (t) => {
   const space = scratch(t);
-  const file = join(fixtures, "orient-64x48-420-01.jpg");
+  const file = join(fixturesDir, "orient-64x48-420-01.jpg");
   for (const value of ["45", "0", "abc", "12.5"]) {
     const result = run(["rotate", file, "--rotate", value], space);
     assert.equal(result.status, 1, `--rotate ${value} must be refused`);
@@ -203,7 +178,7 @@ test("--rotate rejects angles that are not a quarter turn", (t) => {
 
 test("set writes only the tag, and the image data stays untouched", (t) => {
   const space = scratch(t);
-  const file = join(fixtures, "lenna.jpg"); // no Exif at all: the tag has to be added
+  const file = join(fixturesDir, "lenna.jpg"); // no Exif at all: the tag has to be added
   const before = readFileSync(file);
   const tagged = run(["set", file, "6", "-o", "tagged.jpg"], space);
   assert.equal(tagged.status, 0);

@@ -7,13 +7,11 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { copyFile, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
-
 import {
   autoRotate,
   autoRotateBuffer,
@@ -21,17 +19,16 @@ import {
   orientation,
   readOrientation,
   setOrientation,
-} from "../src/index.ts";
-import { parseJpeg } from "../src/jpeg/parse.ts";
-import { transformFor } from "../src/orientation.ts";
+} from "../../src/index.ts";
+import { parseJpeg } from "../../src/jpeg/parse.ts";
+import { transformFor } from "../../src/orientation.ts";
+import { bytesOf, fixturesDir } from "../core/helpers.ts";
 
-const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
 const workDir = await mkdtemp(join(tmpdir(), "lossless-rotate-api-"));
 process.on("exit", () => {
   void rm(workDir, { recursive: true, force: true });
 });
 
-const bytesOf = (file: string): Buffer => readFileSync(join(fixturesDir, file));
 const padded = (value: number): string => String(value).padStart(2, "0");
 
 function haveDjpeg(): boolean {
@@ -242,7 +239,7 @@ test("the metadata helpers work on buffers", () => {
 });
 
 test("readJpeg is exported and maps a missing file onto E_CANT_OPEN", async () => {
-  const { readJpeg } = await import("../src/index.ts");
+  const { readJpeg } = await import("../../src/index.ts");
   const bytes = await readJpeg(join(fixturesDir, "orient-64x48-420-06.jpg"));
   assert.equal(readOrientation(bytes), 6);
   await assert.rejects(readJpeg(join(workDir, "nope.jpg")), (error: unknown) => {

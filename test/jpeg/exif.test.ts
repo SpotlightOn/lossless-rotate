@@ -8,10 +8,8 @@
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
-import { OrientError } from "../src/errors.ts";
 import {
   buildExifApp1,
   insertOrientation,
@@ -19,9 +17,8 @@ import {
   orientationToString,
   patchOrientation,
   readOrientation,
-} from "../src/exif.ts";
-
-const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
+} from "../../src/exif.ts";
+import { bytesOf, differingOffsets, errorCodeOf, fixturesDir, pathOf } from "../core/helpers.ts";
 
 interface Fixture {
   file: string;
@@ -44,33 +41,12 @@ interface Manifest {
 
 const manifest: Manifest = JSON.parse(readFileSync(join(fixturesDir, "manifest.json"), "utf8"));
 const fixtures = manifest.files;
-const pathOf = (file: string): string => join(fixturesDir, file);
-const bytesOf = (file: string): Buffer => readFileSync(pathOf(file));
-
 const orientated = fixtures.filter((f) => f.entryOffset !== undefined);
-const brokenFiles = fixtures.filter((f) => f.expect?.error !== undefined);
-const readableFiles = fixtures.filter((f) => f.expect !== undefined && f.expect.read !== undefined);
-
-function errorCodeOf(run: () => unknown): string {
-  try {
-    run();
-  } catch (error) {
-    if (error instanceof OrientError) return error.code;
-    if (error instanceof Error) return `${error.name}: ${error.message}`;
-    return String(error);
-  }
-  return "<no error>";
-}
-
-/** Offsets at which two buffers differ. */
-function differingOffsets(left: Uint8Array, right: Uint8Array): number[] {
-  const offsets: number[] = [];
-  const length = Math.max(left.length, right.length);
-  for (let i = 0; i < length; i++) {
-    if (left[i] !== right[i]) offsets.push(i);
-  }
-  return offsets;
-}
+// The AVIF fixtures are read and written by their own layer (test/avif/); this file is about JPEG
+// marker layouts and the TIFF code that the two formats share.
+const jpegFixtures = fixtures.filter((f) => f.format !== "avif");
+const brokenFiles = jpegFixtures.filter((f) => f.expect?.error !== undefined);
+const readableFiles = jpegFixtures.filter((f) => f.expect !== undefined && f.expect.read !== undefined);
 
 test("the fixture corpus is present and self-consistent", () => {
   assert.ok(fixtures.length > 30, `expected a real corpus, got ${fixtures.length} fixtures`);

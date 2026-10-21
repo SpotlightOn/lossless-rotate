@@ -5,9 +5,9 @@
 // fixtures are committed, so the test suite itself never needs this script (or GraphicsMagick) to
 // run.
 //
-// The EXIF/APP1 segments and the RIFF/WebP containers written here are built from
+// The EXIF/APP1 segments and the RIFF/WebP and ISOBMFF/AVIF containers written here are built from
 // explicit byte arrays on purpose: they must be an independent implementation, not a round trip
-// through src/exif.ts or src/webp/*.ts, otherwise the tests would only prove that the
+// through src/exif.ts, src/webp/*.ts or src/avif/*.ts, otherwise the tests would only prove that the
 // code agrees with itself. Only the compressed image data comes from an encoder.
 //
 // Requires `gm` (GraphicsMagick) for the base images, `cjpeg` for the re-encoded thumbnails and
@@ -268,6 +268,244 @@ function findOrientationEntryInTiff(file, tiffStart, byteOrder) {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers to build ISOBMFF/AVIF structures by hand
+// ---------------------------------------------------------------------------
+
+const u32be = (v) => Buffer.from([(v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff]);
+
+/** A big endian integer of an arbitrary byte width: `iloc` fields are 0, 4 or 8 bytes wide. */
+function ube(value, size) {
+  const out = Buffer.alloc(size);
+  for (let i = size - 1; i >= 0; i -= 1) {
+    out[i] = value & 0xff;
+    value = Math.floor(value / 256);
+  }
+  return out;
+}
+
+/** One ISOBMFF box: 32-bit big endian size, four character type, then the body. */
+function isoBox(type, ...parts) {
+  const body = Buffer.concat(parts);
+  return Buffer.concat([u32be(body.length + 8), ascii(type), body]);
+}
+
+/** A full box: the four version/flags bytes in front of the payload. */
+function isoFullBox(type, version, flags, ...parts) {
+  return isoBox(type, Buffer.from([version, (flags >> 16) & 0xff, (flags >> 8) & 0xff, flags & 0xff]), ...parts);
+}
+
+/** `ispe`: the coded image size, a full box holding width and height as 32-bit values. */
+const avifIspe = (width, height) => isoFullBox("ispe", 0, 0, u32be(width), u32be(height));
+
+/** `irot`: the rotation angle in the low two bits, everything else reserved and zero. */
+const avifIrot = (angle) => isoBox("irot", Buffer.from([angle & 3]));
+
+/** `imir`: the mirror axis in the least significant bit. */
+const avifImir = (axis) => isoBox("imir", Buffer.from([axis & 1]));
+
+/** A four byte `av1C`; only its presence and type matter here, the tests never decode a fixture. */
+const avifAv1c = () => isoBox("av1C", Buffer.from([0x81, 0x00, 0x00, 0x00]));
+
+/**
+ * `ipma`: which properties apply to which item. Version 0, so 16-bit item ids and one byte per
+ * association (bit 7 = essential). `entries` is a list of `{ id, associations: [{ index, essential }] }`
+ * with 1-based property indices.
+ */
+function avifIpma(entries) {
+  const parts = [u32be(entries.length)];
+  for (const entry of entries) {
+    parts.push(u16be(entry.id), Buffer.from([entry.associations.length]));
+    for (const association of entry.associations) {
+      parts.push(Buffer.from([(association.index & 0x7f) | (association.essential ? 0x80 : 0)]));
+    }
+  }
+  return isoFullBox("ipma", 0, 0, ...parts);
+}
+
+/**
+ * Assembles a whole AVIF by hand: `ftyp` + `meta` (pitm, iinf, iloc, iprp) + `mdat`.
+ *
+ * `properties` are the `ipco` boxes in order, `associations` the primary item's property list,
+ * `otherEntries` further `ipma` entries. The `iloc` extent is made to point at the `mdat` payload,
+ * which is what the write path has to keep correct when `meta` changes size. The image data is a
+ * dummy: the tests never decode one of these hand-built containers, they compare box bytes.
+ *
+ * `ilocVersion` and `baseOffsetSize` pick the `iloc` flavour: version 2 stores a 32-bit `item_ID`,
+ * version 1 and 2 add a `construction_method` field, and a non-zero base offset makes the extents
+ * relative to it instead of absolute. Real encoders pick among these, so the writer has to survive
+ * all of them.
+ */
+function avifFile({
+  properties,
+  associations,
+  otherEntries = [],
+  primaryId = 1,
+  itemType = "av01",
+  mdatPayload = ascii("dummy image data, never decoded by the tests"),
+  majorBrand = "avif",
+  brands = ["avif", "mif1", "miaf", "MA1B"],
+  ilocVersion = 0,
+  baseOffsetSize = 0,
+}) {
+  const ftyp = isoBox("ftyp", ascii(majorBrand), u32be(0), ...brands.map(ascii));
+  const entries = [];
+  if (associations !== null) entries.push({ id: primaryId, associations });
+  entries.push(...otherEntries);
+
+  // The extent offset value does not change any box size, so `meta` is built twice: once with a
+  // placeholder to learn the size, once with the real offset of the `mdat` payload.
+  const buildMeta = (mdatBodyOffset) =>
+    isoFullBox(
+      "meta",
+      0,
+      0,
+      isoFullBox("pitm", 0, 0, u16be(primaryId)),
+      isoFullBox(
+        "iinf",
+        0,
+        0,
+        u16be(1),
+        isoFullBox("infe", 2, 0, u16be(primaryId), u16be(0), ascii(itemType), ascii("Image"), Buffer.from([0])),
+      ),
+      isoFullBox(
+        "iloc",
+        ilocVersion,
+        0,
+        Buffer.from([(4 << 4) | 4, (baseOffsetSize << 4) | 0]), // offset_size 4, length_size 4, base_offset_size, index_size 0
+        u16be(1), // item_count
+        ilocVersion === 2 ? u32be(primaryId) : u16be(primaryId),
+        ...(ilocVersion >= 1 ? [u16be(0)] : []), // construction_method
+        u16be(0), // data_reference_index
+        ...(baseOffsetSize > 0 ? [ube(mdatBodyOffset, baseOffsetSize)] : []),
+        u16be(1), // extent_count
+        ...(baseOffsetSize > 0 ? [u32be(0)] : [u32be(mdatBodyOffset)]),
+        u32be(mdatPayload.length),
+      ),
+      isoBox("iprp", isoBox("ipco", ...properties), avifIpma(entries)),
+    );
+
+  const placeholder = buildMeta(0);
+  const extentOffset = ftyp.length + placeholder.length + 8; // 8 = the mdat box header
+  const meta = buildMeta(extentOffset);
+  if (meta.length !== placeholder.length) throw new Error("avif fixture: meta size depends on the iloc offset");
+  return Buffer.concat([ftyp, meta, isoBox("mdat", mdatPayload)]);
+}
+
+/** Walks one level of ISOBMFF boxes, the independent way to get at types and offsets. */
+function walkIsoBoxes(buffer, start, end) {
+  const boxes = [];
+  let offset = start;
+  while (offset + 8 <= end) {
+    let size = buffer.readUInt32BE(offset);
+    const type = buffer.toString("latin1", offset + 4, offset + 8);
+    let headerSize = 8;
+    if (size === 1) {
+      size = Number(buffer.readBigUInt64BE(offset + 8));
+      headerSize = 16;
+    } else if (size === 0) {
+      size = end - offset;
+    }
+    if (size < headerSize || offset + size > end) throw new Error(`avif fixture box ${type} runs past its parent`);
+    boxes.push({ type, offset, size, headerSize, bodyOffset: offset + headerSize, bodyEnd: offset + size });
+    offset += size;
+  }
+  if (offset !== end) throw new Error("avif fixture box walk did not line up");
+  return boxes;
+}
+
+const isoFirst = (boxes, type) => boxes.find((box) => box.type === type);
+
+/** The orientation an `irot` angle and `imir` axis display as, independent of src/avif. */
+function orientationFor(angle, axis) {
+  const noMirror = [1, 8, 3, 6];
+  const mirrorVertical = [4, 5, 2, 7]; // imir axis 0: top-to-bottom
+  const mirrorHorizontal = [2, 7, 4, 5]; // imir axis 1: left-to-right
+  if (axis === null) return noMirror[angle & 3];
+  return (axis === 0 ? mirrorVertical : mirrorHorizontal)[angle & 3];
+}
+
+/**
+ * Reads everything the AVIF tests assert about a hand-built fixture: its property list, the primary
+ * item, the size, the transform byte offsets and where `iloc` claims the image data is.
+ *
+ * This is the independent implementation of the format the tests compare against; it never imports
+ * anything from `src/`.
+ */
+function avifFixtureInfo(file) {
+  const top = walkIsoBoxes(file, 0, file.length);
+  const meta = isoFirst(top, "meta");
+  const metaChildren = walkIsoBoxes(file, meta.bodyOffset + 4, meta.bodyEnd);
+  const pitm = isoFirst(metaChildren, "pitm");
+  const primaryId = pitm === undefined ? 1 : file.readUInt16BE(pitm.bodyOffset + 4);
+  const iprp = isoFirst(metaChildren, "iprp");
+  const iprpChildren = walkIsoBoxes(file, iprp.bodyOffset, iprp.bodyEnd);
+  const ipco = isoFirst(iprpChildren, "ipco");
+  const ipma = isoFirst(iprpChildren, "ipma");
+  const properties = walkIsoBoxes(file, ipco.bodyOffset, ipco.bodyEnd);
+  const ispe = isoFirst(properties, "ispe");
+  const irot = isoFirst(properties, "irot");
+  const imir = isoFirst(properties, "imir");
+  const iloc = isoFirst(metaChildren, "iloc");
+  const mdat = isoFirst(top, "mdat");
+
+  // ipma entry list (version 0, not wide - all this script writes): id, count, one byte each.
+  const associations = [];
+  let offset = ipma.bodyOffset + 4;
+  const entryCount = file.readUInt32BE(offset);
+  offset += 4;
+  for (let entry = 0; entry < entryCount; entry++) {
+    const id = file.readUInt16BE(offset);
+    const count = file[offset + 2];
+    offset += 3;
+    const list = [];
+    for (let i = 0; i < count; i++) {
+      list.push({ index: file[offset] & 0x7f, essential: (file[offset] & 0x80) !== 0 });
+      offset += 1;
+    }
+    associations.push({ id, list });
+  }
+
+  // iloc: parse its header rather than assuming version 0 with an absolute 4-byte extent, so the
+  // walker stays independent of whatever flavour the fixture was built with.
+  const ilocVersion = file[iloc.bodyOffset];
+  let ilocCursor = iloc.bodyOffset + 4;
+  const ilocSizes = file[ilocCursor];
+  const offsetSize = ilocSizes >> 4;
+  const lengthSize = ilocSizes & 0x0f;
+  ilocCursor += 1;
+  const ilocBaseOffsetSize = file[ilocCursor] >> 4;
+  ilocCursor += 1;
+  ilocCursor += 2; // item_count
+  ilocCursor += ilocVersion === 2 ? 4 : 2; // item_ID
+  if (ilocVersion >= 1) ilocCursor += 2; // construction_method
+  ilocCursor += 2; // data_reference_index
+  let ilocBase = 0;
+  if (ilocBaseOffsetSize > 0) {
+    ilocBase = file.readUIntBE(ilocCursor, ilocBaseOffsetSize);
+    ilocCursor += ilocBaseOffsetSize;
+  }
+  ilocCursor += 2; // extent_count
+  const ilocExtentOffset = ilocBase + file.readUIntBE(ilocCursor, offsetSize);
+  ilocCursor += offsetSize;
+  const ilocExtentLength = file.readUIntBE(ilocCursor, lengthSize);
+
+  return {
+    properties: properties.map((box) => box.type),
+    primaryId,
+    width: ispe === undefined ? null : file.readUInt32BE(ispe.bodyOffset + 4),
+    height: ispe === undefined ? null : file.readUInt32BE(ispe.bodyOffset + 8),
+    irotOffset: irot === undefined ? null : irot.bodyOffset,
+    imirOffset: imir === undefined ? null : imir.bodyOffset,
+    associations,
+    mdatOffset: mdat === undefined ? null : mdat.bodyOffset,
+    ilocVersion,
+    ilocBaseOffsetSize,
+    ilocExtentOffset,
+    ilocExtentLength,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Base images
 // ---------------------------------------------------------------------------
 
@@ -379,6 +617,20 @@ function orientationFixture({ byteOrder, orientation, base, extra = {} }) {
 }
 
 /**
+ * Writes an AVIF fixture and records its layout: property list, primary item, size and the offsets
+ * of the `irot`/`imir` bytes, all read back with the independent walker above.
+ */
+function writeAvifFixture(name, file, { comment, expect }) {
+  writeFixture(name, file, {
+    format: "avif",
+    kind: "avif",
+    comment,
+    expect,
+    avif: avifFixtureInfo(file),
+  });
+}
+
+/**
  * Deletes the fixtures of the previous run, and only those.
  *
  * The previous manifest is the list of files this script owns. The hand-provided samples are
@@ -398,13 +650,24 @@ function removePreviousFixtures() {
     rmSync(join(fixturesDir, entry.file), { force: true });
   }
   mkdirSync(baseDir, { recursive: true });
+  mkdirSync(join(fixturesDir, "avif"), { recursive: true });
 }
 
 /** Hand-provided sample images: registered in the manifest, never generated or rewritten here. */
 const PROVIDED_SAMPLES = [
   ["lenna.png", "image/png"],
   ["lenna.jpg", "image/jpeg"],
+  ["lenna.avif", "image/avif"],
 ];
+
+/**
+ * What the rotation samples are expected to read, keyed by file.
+ *
+ * The AVIF sample comes from an encoder, so it is not the fixed shape `avifFixtureInfo` describes: its
+ * `iloc` stores the extent relative to a base offset, and its `ipco` carries a `pixi` property. It is
+ * therefore registered for its orientation only - the point of a real sample is that it is not hand-built.
+ */
+const SAMPLE_ROTATIONS = new Map([["lenna.avif", 0]]);
 
 function main() {
   removePreviousFixtures();
@@ -610,7 +873,224 @@ function main() {
     expect: { read: 6 },
   });
 
-  // 7. The embedded Exif thumbnail: IFD1 of the Exif block declares a second, small JPEG through
+  // 7. AVIF: the orientation is the `irot`/`imir` property of the primary item, not a metadata tag.
+  //     The containers are assembled by hand right here and the image data is a dummy `mdat`; the
+  //     point of interest is the box structure, above all that the write path keeps the `iloc`
+  //     extent pointing at the same `mdat` bytes when `meta` changes size.
+  const AVIF_WIDTH = 64;
+  const AVIF_HEIGHT = 48;
+  const avifIspeBox = avifIspe(AVIF_WIDTH, AVIF_HEIGHT);
+  const avifAv1cBox = avifAv1c();
+  /** The property associations of a primary item whose first two properties are ispe and av1C. */
+  const avifPrimary = (...extra) => [{ index: 1, essential: false }, { index: 2, essential: true }, ...extra];
+
+  writeAvifFixture(
+    "avif/base.avif",
+    avifFile({ properties: [avifIspeBox, avifAv1cBox], associations: avifPrimary() }),
+    {
+      comment: "ispe + av1C, no irot/imir: the source of the write tests",
+      expect: { read: 0 },
+    },
+  );
+
+  // (a) rotations: irot alone, the angle in the low two bits.
+  for (const angle of [0, 1, 2, 3]) {
+    writeAvifFixture(
+      `avif/irot-${angle}.avif`,
+      avifFile({
+        properties: [avifIspeBox, avifAv1cBox, avifIrot(angle)],
+        associations: avifPrimary({ index: 3, essential: true }),
+      }),
+      { comment: `irot angle ${angle}`, expect: { read: orientationFor(angle, null) } },
+    );
+  }
+
+  // (b) mirrors: imir alone, the axis in the least significant bit.
+  for (const axis of [0, 1]) {
+    writeAvifFixture(
+      `avif/imir-${axis}.avif`,
+      avifFile({
+        properties: [avifIspeBox, avifAv1cBox, avifImir(axis)],
+        associations: avifPrimary({ index: 3, essential: true }),
+      }),
+      { comment: `imir axis ${axis}`, expect: { read: orientationFor(0, axis) } },
+    );
+  }
+
+  // (c) both properties: the rotation is applied before the mirror.
+  for (const [angle, axis] of [
+    [1, 0],
+    [1, 1],
+    [2, 0],
+    [2, 1],
+    [3, 0],
+    [3, 1],
+  ]) {
+    writeAvifFixture(
+      `avif/irot-${angle}-imir-${axis}.avif`,
+      avifFile({
+        properties: [avifIspeBox, avifAv1cBox, avifIrot(angle), avifImir(axis)],
+        associations: avifPrimary({ index: 3, essential: true }, { index: 4, essential: true }),
+      }),
+      { comment: `irot angle ${angle} + imir axis ${axis}`, expect: { read: orientationFor(angle, axis) } },
+    );
+  }
+
+  // (d) edge cases: an irot that belongs to another item does not apply, the primary id comes from
+  //     pitm rather than from the position in ipma, and a primary item may have no ipma entry yet.
+  writeAvifFixture(
+    "avif/irot-unassociated.avif",
+    avifFile({
+      properties: [avifIspeBox, avifAv1cBox, avifIrot(3)],
+      associations: avifPrimary(),
+      otherEntries: [{ id: 2, associations: [{ index: 3, essential: true }] }],
+    }),
+    { comment: "irot belongs to item 2, not the primary item 1: reading gives 0", expect: { read: 0 } },
+  );
+  writeAvifFixture(
+    "avif/primary-2.avif",
+    avifFile({
+      primaryId: 2,
+      properties: [avifIspeBox, avifAv1cBox, avifIrot(3)],
+      associations: avifPrimary({ index: 3, essential: true }),
+    }),
+    { comment: "pitm names item 2 as the primary: its irot applies", expect: { read: 6 } },
+  );
+  writeAvifFixture(
+    "avif/no-primary-ipma.avif",
+    avifFile({
+      properties: [avifIspeBox, avifAv1cBox],
+      associations: null,
+      otherEntries: [{ id: 2, associations: avifPrimary() }],
+    }),
+    { comment: "no ipma entry for the primary item: reading gives 0, writing adds one", expect: { read: 0 } },
+  );
+
+  // (d2) iloc flavours: the write path rewrites the extents, so it has to parse each shape exactly
+  //      the way the encoder wrote it. Version 2 stores a 32-bit item_ID, version 1 adds a
+  //      construction_method field, and a base offset makes the extents relative to it. Every
+  //      flavour gets a write source and the byte-for-byte result of writing orientation 6 into it.
+  for (const [name, ilocVersion, baseOffsetSize] of [
+    ["iloc-v1", 1, 0],
+    ["iloc-v2", 2, 0],
+    ["iloc-base-offset", 0, 4],
+  ]) {
+    const flavour = `iloc version ${ilocVersion}, base_offset_size ${baseOffsetSize}`;
+    writeAvifFixture(
+      `avif/${name}.avif`,
+      avifFile({ properties: [avifIspeBox, avifAv1cBox], associations: avifPrimary(), ilocVersion, baseOffsetSize }),
+      { comment: `${flavour}, no irot/imir: a write source`, expect: { read: 0 } },
+    );
+    writeAvifFixture(
+      `avif/irot-3-${name}.avif`,
+      avifFile({
+        properties: [avifIspeBox, avifAv1cBox, avifIrot(3)],
+        associations: avifPrimary({ index: 3, essential: true }),
+        ilocVersion,
+        baseOffsetSize,
+      }),
+      { comment: `${flavour}, irot 3: the exact result of writing orientation 6`, expect: { read: 6 } },
+    );
+  }
+
+  // (e) malformed containers, written as plain error fixtures (the independent walker cannot describe
+  //     them, so they are byte edits of a valid file or fragments assembled on their own).
+  const avifMalformed = (name, bytes, code, comment) =>
+    writeFixture(name, bytes, { format: "avif", kind: "error", comment, expect: { error: code } });
+
+  avifMalformed(
+    "avif/err-sequence.avif",
+    Buffer.concat([
+      isoBox("ftyp", ascii("avis"), u32be(0), ascii("avis"), ascii("msf1")),
+      isoBox("moov", ascii("track based, no item meta")),
+      isoBox("mdat", ascii("image data")),
+    ]),
+    "E_UNSUPPORTED_FORMAT",
+    "an AVIF image sequence (avis), which has no item properties to orient",
+  );
+
+  const avifValid = avifFile({ properties: [avifIspeBox, avifAv1cBox], associations: avifPrimary() });
+  const avifBoxOffset = (type) => walkIsoBoxes(avifValid, 0, avifValid.length).find((box) => box.type === type).offset;
+
+  avifMalformed(
+    "avif/err-not-avif.avif",
+    avifFile({
+      properties: [avifIspeBox, avifAv1cBox],
+      associations: avifPrimary(),
+      majorBrand: "isom",
+      brands: ["isom", "mp41"],
+    }),
+    "E_UNSUPPORTED_FORMAT",
+    "ftyp whose major and compatible brands are not AVIF",
+  );
+  avifMalformed(
+    "avif/err-tiny.avif",
+    Buffer.alloc(8),
+    "E_UNSUPPORTED_FORMAT",
+    "eight bytes, far too short for an ftyp",
+  );
+  avifMalformed(
+    "avif/err-truncated-box.avif",
+    (() => {
+      const bytes = Buffer.from(avifValid);
+      bytes.writeUInt32BE(99999, avifBoxOffset("meta")); // the meta box size field
+      return bytes;
+    })(),
+    "E_INVALID_AVIF",
+    "the meta box declares 99999 bytes, the file is much shorter",
+  );
+  avifMalformed(
+    "avif/err-trailing-bytes.avif",
+    Buffer.concat([avifValid, Buffer.from([0, 0, 0])]),
+    "E_INVALID_AVIF",
+    "three bytes after the last top-level box",
+  );
+  avifMalformed(
+    "avif/err-no-meta.avif",
+    Buffer.concat([
+      isoBox("ftyp", ascii("mif1"), u32be(0), ascii("avif"), ascii("miaf")),
+      isoBox("mdat", ascii("image data")),
+    ]),
+    "E_INVALID_AVIF",
+    "an AVIF ftyp but no meta box",
+  );
+  avifMalformed(
+    "avif/err-meta-no-iprp.avif",
+    Buffer.concat([
+      isoBox("ftyp", ascii("avif"), u32be(0), ascii("mif1"), ascii("miaf")),
+      isoFullBox("meta", 0, 0, isoFullBox("pitm", 0, 0, u16be(1))),
+      isoBox("mdat", ascii("image data")),
+    ]),
+    "E_INVALID_AVIF",
+    "the meta box has no iprp box",
+  );
+  avifMalformed(
+    "avif/err-iprp-no-ipco.avif",
+    Buffer.concat([
+      isoBox("ftyp", ascii("avif"), u32be(0), ascii("mif1"), ascii("miaf")),
+      isoFullBox(
+        "meta",
+        0,
+        0,
+        isoFullBox("pitm", 0, 0, u16be(1)),
+        isoBox("iprp", avifIpma([{ id: 1, associations: [] }])),
+      ),
+      isoBox("mdat", ascii("image data")),
+    ]),
+    "E_INVALID_AVIF",
+    "the iprp box has an ipma but no ipco",
+  );
+  avifMalformed(
+    "avif/err-empty-irot.avif",
+    avifFile({
+      properties: [avifIspeBox, avifAv1cBox, isoBox("irot")],
+      associations: avifPrimary({ index: 3, essential: true }),
+    }),
+    "E_INVALID_AVIF",
+    "the associated irot property has an empty body",
+  );
+
+  // 8. The embedded Exif thumbnail: IFD1 of the Exif block declares a second, small JPEG through
   //    tags 0x0201/0x0202. The main image and the thumbnail are different images, so a mix-up cannot
   //    hide, and both are MCU aligned under every primitive.
   const thumbnailSource = readFileSync(join(baseDir, "pattern-64x48-444.jpg"));
@@ -741,12 +1221,17 @@ function main() {
   for (const [file, mediaType] of PROVIDED_SAMPLES) {
     const path = join(fixturesDir, file);
     if (!existsSync(path)) throw new Error(`the provided sample ${file} is missing: it is not generated here`);
+    const rotation = SAMPLE_ROTATIONS.get(file);
     manifest.files.push({
       file,
       bytes: statSync(path).size,
       kind: "sample",
       mediaType,
-      comment: "hand-provided sample, not generated by this script",
+      ...(rotation === undefined ? {} : { format: mediaType.split("/")[1], expect: { read: rotation } }),
+      comment:
+        rotation === undefined
+          ? "hand-provided sample, not generated by this script"
+          : "hand-provided sample from an encoder: read for real-world box layouts, never written to",
     });
   }
 

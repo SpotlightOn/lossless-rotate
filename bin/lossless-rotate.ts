@@ -16,15 +16,21 @@ import { parseArgs } from "node:util";
 
 import {
   autoRotateBuffer,
+  avifImageSizeFromBuffer,
+  avifLayout,
+  avifPropertyTypes,
   canTransform,
   composeTransforms,
   findExifApp1,
+  isAvif,
   isIdentity,
   locateExifThumbnail,
   type OrientationPrimitive,
+  OrientError,
   orientationToString,
   parseJpeg,
   type Rotation,
+  readAvifOrientation,
   readOrientation,
   readOrientationInExifBlock,
   setOrientation,
@@ -61,12 +67,17 @@ file already carries (90, 180 or 270 degrees, or a mirror). With --rotate <deg> 
 a fixed amount instead, counted from the way it is displayed. There is nothing to compute by hand -
 the orientation says it, and "info" prints it.
 
+AVIF pixels are never rotated: the AV1 bitstream has no lossless transform, so "set" writes the
+orientation instead (an irot/imir property) and "rotate" refuses them.
+
 Examples:
   lossless-rotate info photo.jpg
+  lossless-rotate info photo.avif
   lossless-rotate rotate photo.jpg --thumbnail
   lossless-rotate rotate photo.jpg --rotate 90
   lossless-rotate rotate *.jpg -o upright/
   lossless-rotate set photo.jpg 6 -o tagged/photo.jpg
+  lossless-rotate set photo.avif 6
   lossless-rotate thumbnail photo.jpg
 `;
 
@@ -88,7 +99,7 @@ interface ThumbnailInfo {
 
 interface FormatInfo {
   file: string;
-  format: "jpeg" | "unknown";
+  format: "jpeg" | "avif" | "unknown";
   orientation: number;
   orientationName?: string;
   transform?: OrientationPrimitive;
@@ -97,6 +108,7 @@ interface FormatInfo {
   height?: number;
   sampling?: string;
   progressive?: boolean;
+  properties?: string[];
   thumbnail?: ThumbnailInfo;
 }
 
@@ -119,6 +131,22 @@ function samplingLabel(components: { h: number; v: number }[]): string {
 /** Reads everything the CLI reports about a file, without changing anything. */
 function describe(file: string): FormatInfo {
   const bytes = readFileSync(file);
+
+  if (isAvif(bytes)) {
+    const orientation = readAvifOrientation(bytes);
+    const size = avifImageSizeFromBuffer(bytes);
+    return {
+      file,
+      format: "avif",
+      orientation,
+      orientationName: orientation === 0 ? undefined : orientationToString(orientation),
+      transform: "none",
+      alreadyUpright: orientation === 0 || isIdentity(transformFor(orientation)),
+      width: size.width,
+      height: size.height,
+      properties: avifPropertyTypes(avifLayout(bytes)),
+    };
+  }
 
   if (bytes.length < 2 || bytes[0] !== 0xff || bytes[1] !== 0xd8) {
     return { file, format: "unknown", orientation: 0 };
@@ -184,20 +212,24 @@ function commandInfo(options: Options, files: string[]): number {
     ["format", info.format],
   ];
   if (info.format === "unknown") {
-    rows.push(["note", "not a JPEG, so there is no orientation this package could read"]);
+    rows.push(["note", "not a JPEG or AVIF, so there is no orientation this package could read"]);
   } else {
     if (info.width !== undefined) rows.push(["size", `${info.width}x${info.height}`]);
     if (info.sampling !== undefined) rows.push(["sampling", info.sampling]);
     if (info.progressive !== undefined) rows.push(["progressive", info.progressive ? "yes" : "no"]);
-    rows.push(["orientation", info.orientation === 0 ? "0 (no tag)" : `${info.orientation} (${info.orientationName})`]);
-    rows.push(["transform", info.alreadyUpright ? "none (already upright)" : `${info.transform}`]);
-    rows.push([
-      "thumbnail",
-      info.thumbnail === undefined
-        ? "none"
-        : `${info.thumbnail.length} bytes at offset ${info.thumbnail.offset}` +
-          (info.thumbnail.transformable ? ", can be rotated" : ", cannot be transformed"),
-    ]);
+    const none = info.format === "avif" ? "0 (none)" : "0 (no tag)";
+    rows.push(["orientation", info.orientation === 0 ? none : `${info.orientation} (${info.orientationName})`]);
+    if (info.properties !== undefined) rows.push(["properties", info.properties.join(" ")]);
+    if (info.format === "jpeg") {
+      rows.push(["transform", info.alreadyUpright ? "none (already upright)" : `${info.transform}`]);
+      rows.push([
+        "thumbnail",
+        info.thumbnail === undefined
+          ? "none"
+          : `${info.thumbnail.length} bytes at offset ${info.thumbnail.offset}` +
+            (info.thumbnail.transformable ? ", can be rotated" : ", cannot be transformed"),
+      ]);
+    }
   }
 
   const labelWidth = Math.max(...rows.map(([key]) => key.length));
@@ -244,6 +276,14 @@ function uprightOutcome(source: Buffer, options: Options): Outcome {
 /** The caller decides: the stored orientation is applied first, then the requested rotation. */
 function turnedOutcome(source: Buffer, options: Options): Outcome {
   const rotation = options.rotation!;
+  if (isAvif(source)) {
+    throw new OrientError(
+      "E_UNSUPPORTED",
+      `cannot turn an AVIF by ${rotation} degrees: the AV1 bitstream cannot be rotated without ` +
+        "re-encoding, so use `set <file> <orientation>` to write the irot/imir property instead",
+    );
+  }
+
   const orientation = readOrientation(source);
   const combined = composeTransforms(transformFor(orientation === 0 ? 1 : orientation), transformForRotation(rotation));
   if (isIdentity(combined)) {

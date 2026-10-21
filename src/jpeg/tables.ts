@@ -3,7 +3,8 @@
  *
  * The Huffman tables below are the standard Annex K tables. They were extracted from a jpegtran
  * output file (`jpegtran -copy none`, which always writes the standard tables) instead of being
- * typed from memory, and `test/jpeg-tables.test.ts` checks their canonical properties.
+ * typed from memory; `test/jpeg/roundtrip.test.ts` and `test/jpeg/differential.test.ts` exercise them on
+ * every run.
  *
  * They are used for *encoding*: the source file's own tables are reused for decoding, but they may
  * not be sufficient for the output, because reordering the blocks changes the DC differentials and

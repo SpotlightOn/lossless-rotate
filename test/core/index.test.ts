@@ -7,15 +7,12 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { copyFile, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
+import { autoRotate, OrientError, orientation, orientationToString, transformFor } from "../../src/index.ts";
+import { fixturesDir, packageRoot } from "./helpers.ts";
 
-import { autoRotate, OrientError, orientation, orientationToString, transformFor } from "../src/index.ts";
-
-const testDir = dirname(fileURLToPath(import.meta.url));
-const fixturesDir = join(testDir, "fixtures");
-const packageRoot = dirname(testDir);
 const workDir = await mkdtemp(join(tmpdir(), "jpegorientation-api-"));
 process.on("exit", () => {
   void rm(workDir, { recursive: true, force: true });

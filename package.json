@@ -9,7 +9,7 @@
     "type": "git",
     "url": "git+https://github.com/SpotlightOn/lossless-rotate.git"
   },
-  "description": "Make JPEGs upright: read and write the EXIF orientation tag and rotate JPEGs losslessly in the DCT domain.",
+  "description": "Make JPEGs upright: read and write the EXIF orientation tag, rotate JPEGs losslessly in the DCT domain, and handle the orientation of AVIF.",
   "author": {
     "name": "Your Name",
     "email": "you@example.com"
@@ -22,6 +22,7 @@
   "keywords": [
     "jpeg",
     "jpg",
+    "avif",
     "exif",
     "orientation",
     "autorotate",
@@ -29,12 +30,16 @@
     "rotate",
     "lossless",
     "jpegtran",
-    "dct"
+    "dct",
+    "isobmff",
+    "irot",
+    "imir"
   ],
   "exports": {
     ".": "./src/index.ts",
     "./exif": "./src/exif.ts",
-    "./orientation": "./src/orientation.ts"
+    "./orientation": "./src/orientation.ts",
+    "./avif": "./src/avif/orientation.ts"
   },
   "bin": {
     "lossless-rotate": "./bin/lossless-rotate.ts"

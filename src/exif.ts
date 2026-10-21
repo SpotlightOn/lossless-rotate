@@ -19,7 +19,8 @@
  * Only finding and patching are JPEG specific (`locateOrientation`, `patchOrientation`); everything
  * below that works on any buffer that contains a TIFF block (`locateOrientationInExifBlock`,
  * `patchOrientationInExifBlock`, `buildExifTiff`). Such a block may sit inside any container that
- * carries Exif, without the "Exif\0\0" signature the JPEG format wraps around it.
+ * carries Exif: an AVIF `Exif` item holds the same TIFF structure as an APP1 payload, without the
+ * "Exif\0\0" signature the JPEG format wraps around it.
  *
  * The same is true for the embedded thumbnail (`locateExifThumbnail`, `replaceExifThumbnail`): an
  * Exif block may carry a small JPEG copy of the image in IFD1, reachable through tags 0x0201/0x0202.
@@ -128,7 +129,7 @@ export function locateOrientation(
 }
 
 /**
- * Locates the orientation tag in any buffer that holds a TIFF block.
+ * Locates the orientation tag in any buffer that holds a TIFF block, e.g. an AVIF `Exif` item.
  *
  * Offsets are absolute in `buffer`; `end` is the first byte behind the block, so a container can
  * hand in a payload without copying it. Everything behind the block is invisible to the parser,

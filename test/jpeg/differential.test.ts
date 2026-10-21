@@ -14,16 +14,14 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
+import { transformJpeg } from "../../src/jpeg/codec.ts";
+import { decodeCoefficients } from "../../src/jpeg/decoder.ts";
+import { parseJpeg } from "../../src/jpeg/parse.ts";
+import type { OrientationPrimitive } from "../../src/orientation.ts";
+import { fixturesDir } from "../core/helpers.ts";
 
-import { transformJpeg } from "../src/jpeg/codec.ts";
-import { decodeCoefficients } from "../src/jpeg/decoder.ts";
-import { parseJpeg } from "../src/jpeg/parse.ts";
-import type { OrientationPrimitive } from "../src/orientation.ts";
-
-const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
 const workDir = mkdtempSync(join(tmpdir(), "lossless-rotate-diff-"));
 process.on("exit", () => rmSync(workDir, { recursive: true, force: true }));
 

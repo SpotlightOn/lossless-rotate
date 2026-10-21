@@ -9,14 +9,12 @@ import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import { copyFile, mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
-import { OrientError } from "../src/errors.ts";
-import { buildExifApp1, readOrientation } from "../src/exif.ts";
-import { readOrientationFromFile, writeOrientationToFile } from "../src/file.ts";
-
-const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
+import { OrientError } from "../../src/errors.ts";
+import { buildExifApp1, readOrientation } from "../../src/exif.ts";
+import { readOrientationFromFile, writeOrientationToFile } from "../../src/file.ts";
+import { differingOffsets, fixturesDir } from "../core/helpers.ts";
 
 interface Fixture {
   file: string;
@@ -40,14 +38,6 @@ async function staged(fixture: string): Promise<string> {
   const target = join(workDir, fixture);
   await copyFile(join(fixturesDir, fixture), target);
   return target;
-}
-
-function differingOffsets(left: Uint8Array, right: Uint8Array): number[] {
-  const offsets: number[] = [];
-  for (let i = 0; i < Math.max(left.length, right.length); i++) {
-    if (left[i] !== right[i]) offsets.push(i);
-  }
-  return offsets;
 }
 
 async function codeOf(run: () => Promise<unknown>): Promise<string> {

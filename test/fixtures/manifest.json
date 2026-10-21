@@ -750,6 +750,1118 @@
       }
     },
     {
+      "file": "avif/base.avif",
+      "bytes": 249,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "ispe + av1C, no irot/imir: the source of the write tests",
+      "expect": {
+        "read": 0
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": null,
+        "imirOffset": null,
+        "associations": [
+          {
+            "id": 1,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 205,
+        "ilocVersion": 0,
+        "ilocBaseOffsetSize": 0,
+        "ilocExtentOffset": 205,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/irot-0.avif",
+      "bytes": 259,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "irot angle 0",
+      "expect": {
+        "read": 1
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C",
+          "irot"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": 184,
+        "imirOffset": null,
+        "associations": [
+          {
+            "id": 1,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              },
+              {
+                "index": 3,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 215,
+        "ilocVersion": 0,
+        "ilocBaseOffsetSize": 0,
+        "ilocExtentOffset": 215,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/irot-1.avif",
+      "bytes": 259,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "irot angle 1",
+      "expect": {
+        "read": 8
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C",
+          "irot"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": 184,
+        "imirOffset": null,
+        "associations": [
+          {
+            "id": 1,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              },
+              {
+                "index": 3,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 215,
+        "ilocVersion": 0,
+        "ilocBaseOffsetSize": 0,
+        "ilocExtentOffset": 215,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/irot-2.avif",
+      "bytes": 259,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "irot angle 2",
+      "expect": {
+        "read": 3
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C",
+          "irot"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": 184,
+        "imirOffset": null,
+        "associations": [
+          {
+            "id": 1,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              },
+              {
+                "index": 3,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 215,
+        "ilocVersion": 0,
+        "ilocBaseOffsetSize": 0,
+        "ilocExtentOffset": 215,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/irot-3.avif",
+      "bytes": 259,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "irot angle 3",
+      "expect": {
+        "read": 6
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C",
+          "irot"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": 184,
+        "imirOffset": null,
+        "associations": [
+          {
+            "id": 1,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              },
+              {
+                "index": 3,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 215,
+        "ilocVersion": 0,
+        "ilocBaseOffsetSize": 0,
+        "ilocExtentOffset": 215,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/imir-0.avif",
+      "bytes": 259,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "imir axis 0",
+      "expect": {
+        "read": 4
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C",
+          "imir"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": null,
+        "imirOffset": 184,
+        "associations": [
+          {
+            "id": 1,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              },
+              {
+                "index": 3,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 215,
+        "ilocVersion": 0,
+        "ilocBaseOffsetSize": 0,
+        "ilocExtentOffset": 215,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/imir-1.avif",
+      "bytes": 259,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "imir axis 1",
+      "expect": {
+        "read": 2
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C",
+          "imir"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": null,
+        "imirOffset": 184,
+        "associations": [
+          {
+            "id": 1,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              },
+              {
+                "index": 3,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 215,
+        "ilocVersion": 0,
+        "ilocBaseOffsetSize": 0,
+        "ilocExtentOffset": 215,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/irot-1-imir-0.avif",
+      "bytes": 269,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "irot angle 1 + imir axis 0",
+      "expect": {
+        "read": 5
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C",
+          "irot",
+          "imir"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": 184,
+        "imirOffset": 193,
+        "associations": [
+          {
+            "id": 1,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              },
+              {
+                "index": 3,
+                "essential": true
+              },
+              {
+                "index": 4,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 225,
+        "ilocVersion": 0,
+        "ilocBaseOffsetSize": 0,
+        "ilocExtentOffset": 225,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/irot-1-imir-1.avif",
+      "bytes": 269,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "irot angle 1 + imir axis 1",
+      "expect": {
+        "read": 7
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C",
+          "irot",
+          "imir"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": 184,
+        "imirOffset": 193,
+        "associations": [
+          {
+            "id": 1,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              },
+              {
+                "index": 3,
+                "essential": true
+              },
+              {
+                "index": 4,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 225,
+        "ilocVersion": 0,
+        "ilocBaseOffsetSize": 0,
+        "ilocExtentOffset": 225,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/irot-2-imir-0.avif",
+      "bytes": 269,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "irot angle 2 + imir axis 0",
+      "expect": {
+        "read": 2
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C",
+          "irot",
+          "imir"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": 184,
+        "imirOffset": 193,
+        "associations": [
+          {
+            "id": 1,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              },
+              {
+                "index": 3,
+                "essential": true
+              },
+              {
+                "index": 4,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 225,
+        "ilocVersion": 0,
+        "ilocBaseOffsetSize": 0,
+        "ilocExtentOffset": 225,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/irot-2-imir-1.avif",
+      "bytes": 269,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "irot angle 2 + imir axis 1",
+      "expect": {
+        "read": 4
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C",
+          "irot",
+          "imir"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": 184,
+        "imirOffset": 193,
+        "associations": [
+          {
+            "id": 1,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              },
+              {
+                "index": 3,
+                "essential": true
+              },
+              {
+                "index": 4,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 225,
+        "ilocVersion": 0,
+        "ilocBaseOffsetSize": 0,
+        "ilocExtentOffset": 225,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/irot-3-imir-0.avif",
+      "bytes": 269,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "irot angle 3 + imir axis 0",
+      "expect": {
+        "read": 7
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C",
+          "irot",
+          "imir"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": 184,
+        "imirOffset": 193,
+        "associations": [
+          {
+            "id": 1,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              },
+              {
+                "index": 3,
+                "essential": true
+              },
+              {
+                "index": 4,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 225,
+        "ilocVersion": 0,
+        "ilocBaseOffsetSize": 0,
+        "ilocExtentOffset": 225,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/irot-3-imir-1.avif",
+      "bytes": 269,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "irot angle 3 + imir axis 1",
+      "expect": {
+        "read": 5
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C",
+          "irot",
+          "imir"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": 184,
+        "imirOffset": 193,
+        "associations": [
+          {
+            "id": 1,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              },
+              {
+                "index": 3,
+                "essential": true
+              },
+              {
+                "index": 4,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 225,
+        "ilocVersion": 0,
+        "ilocBaseOffsetSize": 0,
+        "ilocExtentOffset": 225,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/irot-unassociated.avif",
+      "bytes": 262,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "irot belongs to item 2, not the primary item 1: reading gives 0",
+      "expect": {
+        "read": 0
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C",
+          "irot"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": 184,
+        "imirOffset": null,
+        "associations": [
+          {
+            "id": 1,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "list": [
+              {
+                "index": 3,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 218,
+        "ilocVersion": 0,
+        "ilocBaseOffsetSize": 0,
+        "ilocExtentOffset": 218,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/primary-2.avif",
+      "bytes": 259,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "pitm names item 2 as the primary: its irot applies",
+      "expect": {
+        "read": 6
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C",
+          "irot"
+        ],
+        "primaryId": 2,
+        "width": 64,
+        "height": 48,
+        "irotOffset": 184,
+        "imirOffset": null,
+        "associations": [
+          {
+            "id": 2,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              },
+              {
+                "index": 3,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 215,
+        "ilocVersion": 0,
+        "ilocBaseOffsetSize": 0,
+        "ilocExtentOffset": 215,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/no-primary-ipma.avif",
+      "bytes": 249,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "no ipma entry for the primary item: reading gives 0, writing adds one",
+      "expect": {
+        "read": 0
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": null,
+        "imirOffset": null,
+        "associations": [
+          {
+            "id": 2,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 205,
+        "ilocVersion": 0,
+        "ilocBaseOffsetSize": 0,
+        "ilocExtentOffset": 205,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/iloc-v1.avif",
+      "bytes": 251,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "iloc version 1, base_offset_size 0, no irot/imir: a write source",
+      "expect": {
+        "read": 0
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": null,
+        "imirOffset": null,
+        "associations": [
+          {
+            "id": 1,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 207,
+        "ilocVersion": 1,
+        "ilocBaseOffsetSize": 0,
+        "ilocExtentOffset": 207,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/irot-3-iloc-v1.avif",
+      "bytes": 261,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "iloc version 1, base_offset_size 0, irot 3: the exact result of writing orientation 6",
+      "expect": {
+        "read": 6
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C",
+          "irot"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": 186,
+        "imirOffset": null,
+        "associations": [
+          {
+            "id": 1,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              },
+              {
+                "index": 3,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 217,
+        "ilocVersion": 1,
+        "ilocBaseOffsetSize": 0,
+        "ilocExtentOffset": 217,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/iloc-v2.avif",
+      "bytes": 253,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "iloc version 2, base_offset_size 0, no irot/imir: a write source",
+      "expect": {
+        "read": 0
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": null,
+        "imirOffset": null,
+        "associations": [
+          {
+            "id": 1,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 209,
+        "ilocVersion": 2,
+        "ilocBaseOffsetSize": 0,
+        "ilocExtentOffset": 209,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/irot-3-iloc-v2.avif",
+      "bytes": 263,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "iloc version 2, base_offset_size 0, irot 3: the exact result of writing orientation 6",
+      "expect": {
+        "read": 6
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C",
+          "irot"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": 188,
+        "imirOffset": null,
+        "associations": [
+          {
+            "id": 1,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              },
+              {
+                "index": 3,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 219,
+        "ilocVersion": 2,
+        "ilocBaseOffsetSize": 0,
+        "ilocExtentOffset": 219,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/iloc-base-offset.avif",
+      "bytes": 253,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "iloc version 0, base_offset_size 4, no irot/imir: a write source",
+      "expect": {
+        "read": 0
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": null,
+        "imirOffset": null,
+        "associations": [
+          {
+            "id": 1,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 209,
+        "ilocVersion": 0,
+        "ilocBaseOffsetSize": 4,
+        "ilocExtentOffset": 209,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/irot-3-iloc-base-offset.avif",
+      "bytes": 263,
+      "format": "avif",
+      "kind": "avif",
+      "comment": "iloc version 0, base_offset_size 4, irot 3: the exact result of writing orientation 6",
+      "expect": {
+        "read": 6
+      },
+      "avif": {
+        "properties": [
+          "ispe",
+          "av1C",
+          "irot"
+        ],
+        "primaryId": 1,
+        "width": 64,
+        "height": 48,
+        "irotOffset": 188,
+        "imirOffset": null,
+        "associations": [
+          {
+            "id": 1,
+            "list": [
+              {
+                "index": 1,
+                "essential": false
+              },
+              {
+                "index": 2,
+                "essential": true
+              },
+              {
+                "index": 3,
+                "essential": true
+              }
+            ]
+          }
+        ],
+        "mdatOffset": 219,
+        "ilocVersion": 0,
+        "ilocBaseOffsetSize": 4,
+        "ilocExtentOffset": 219,
+        "ilocExtentLength": 44
+      }
+    },
+    {
+      "file": "avif/err-sequence.avif",
+      "bytes": 75,
+      "format": "avif",
+      "kind": "error",
+      "comment": "an AVIF image sequence (avis), which has no item properties to orient",
+      "expect": {
+        "error": "E_UNSUPPORTED_FORMAT"
+      }
+    },
+    {
+      "file": "avif/err-not-avif.avif",
+      "bytes": 241,
+      "format": "avif",
+      "kind": "error",
+      "comment": "ftyp whose major and compatible brands are not AVIF",
+      "expect": {
+        "error": "E_UNSUPPORTED_FORMAT"
+      }
+    },
+    {
+      "file": "avif/err-tiny.avif",
+      "bytes": 8,
+      "format": "avif",
+      "kind": "error",
+      "comment": "eight bytes, far too short for an ftyp",
+      "expect": {
+        "error": "E_UNSUPPORTED_FORMAT"
+      }
+    },
+    {
+      "file": "avif/err-truncated-box.avif",
+      "bytes": 249,
+      "format": "avif",
+      "kind": "error",
+      "comment": "the meta box declares 99999 bytes, the file is much shorter",
+      "expect": {
+        "error": "E_INVALID_AVIF"
+      }
+    },
+    {
+      "file": "avif/err-trailing-bytes.avif",
+      "bytes": 252,
+      "format": "avif",
+      "kind": "error",
+      "comment": "three bytes after the last top-level box",
+      "expect": {
+        "error": "E_INVALID_AVIF"
+      }
+    },
+    {
+      "file": "avif/err-no-meta.avif",
+      "bytes": 42,
+      "format": "avif",
+      "kind": "error",
+      "comment": "an AVIF ftyp but no meta box",
+      "expect": {
+        "error": "E_INVALID_AVIF"
+      }
+    },
+    {
+      "file": "avif/err-meta-no-iprp.avif",
+      "bytes": 68,
+      "format": "avif",
+      "kind": "error",
+      "comment": "the meta box has no iprp box",
+      "expect": {
+        "error": "E_INVALID_AVIF"
+      }
+    },
+    {
+      "file": "avif/err-iprp-no-ipco.avif",
+      "bytes": 95,
+      "format": "avif",
+      "kind": "error",
+      "comment": "the iprp box has an ipma but no ipco",
+      "expect": {
+        "error": "E_INVALID_AVIF"
+      }
+    },
+    {
+      "file": "avif/err-empty-irot.avif",
+      "bytes": 258,
+      "format": "avif",
+      "kind": "error",
+      "comment": "the associated irot property has an empty body",
+      "expect": {
+        "error": "E_INVALID_AVIF"
+      }
+    },
+    {
       "file": "exif-thumbnail-06.jpg",
       "bytes": 8274,
       "kind": "thumbnail",
@@ -988,6 +2100,17 @@
       "kind": "sample",
       "mediaType": "image/webp",
       "comment": "hand-provided sample, not generated by this script"
+    },
+    {
+      "file": "lenna.avif",
+      "bytes": 14459,
+      "kind": "sample",
+      "mediaType": "image/avif",
+      "format": "avif",
+      "expect": {
+        "read": 0
+      },
+      "comment": "hand-provided sample from an encoder: read for real-world box layouts, never written to"
     }
   ],
   "baseSegments": {

@@ -1,18 +1,33 @@
 /**
- * @spotlighton/lossless-rotate - make JPEGs upright without re-encoding the image data.
+ * @spotlighton/lossless-rotate - make JPEGs upright, and read/write the orientation of AVIF.
  *
- * Read and write the orientation of JPEG (Exif tag) and rotate JPEG images losslessly in the DCT
- * domain: no dequantization, no requantization, no quality loss. Zero dependencies.
+ * Read and write the orientation of JPEG (Exif tag) and AVIF (`irot`/`imir` property), and rotate
+ * JPEG images losslessly in the DCT domain: no dequantization, no requantization, no quality loss.
+ * Zero dependencies.
  *
  *   import { autoRotate, orientation } from "@spotlighton/lossless-rotate";
  *
  *   await orientation("IMG_0001.jpg");                 // -> 6
  *   await orientation("IMG_0001.jpg", 1);              // metadata only, lossless
  *   await autoRotate("IMG_0001.jpg", "upright.jpg");   // lossless rotation
+ *
+ *   await orientation("photo.avif");                   // -> 6, from the irot/imir property
+ *   await orientation("photo.avif", 6);                // metadata only, adds irot/imir if needed
  */
 
 export type { AutoRotateOptions, AutoRotateResult } from "./autoRotate.ts";
 export { autoRotate, autoRotateBuffer, canTransform, setOrientation } from "./autoRotate.ts";
+export type { IsoBox } from "./avif/container.ts";
+export { isAvif, isAvifSequence, parseLocalBoxes } from "./avif/container.ts";
+export type { AvifLayout, AvifSize } from "./avif/item.ts";
+export { avifImageSize, avifLayout, avifPropertyTypes } from "./avif/item.ts";
+export type { AvifPatchResult } from "./avif/orientation.ts";
+export {
+  avifImageSizeFromBuffer,
+  readAvifOrientation,
+  setAvifOrientation,
+  writeAvifOrientation,
+} from "./avif/orientation.ts";
 export type { ErrorCode } from "./errors.ts";
 export { OrientError } from "./errors.ts";
 export type { ByteOrder, ExifThumbnail, OrientationLocation, PatchResult } from "./exif.ts";
@@ -69,10 +84,12 @@ function withCallback<T>(promise: Promise<T>, callback?: (error: Error | null, v
 }
 
 /**
- * Reads the orientation of a JPEG file, or sets it when a value is passed.
+ * Reads the orientation of a JPEG or AVIF file, or sets it when a value is passed.
  *
- * Setting only rewrites metadata; it never rotates the image and never re-encodes it. It is ten bytes
- * patched in place. Use `autoRotate` to actually rotate.
+ * Setting only rewrites metadata; it never rotates the image and never re-encodes it. For JPEG it is
+ * ten bytes patched in place; an AVIF with no `irot`/`imir` property gets one, without touching the
+ * image data. Use `autoRotate` to actually rotate - for JPEG, which can be rotated losslessly; AVIF
+ * has no lossless rotation of its bitstream, so the orientation property is the answer there.
  *
  * @returns the orientation value, or 0 when the file has no orientation.
  */

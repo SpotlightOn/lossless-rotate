@@ -7,16 +7,12 @@
  */
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
-import { transformJpeg } from "../src/jpeg/codec.ts";
-import { decodeCoefficients } from "../src/jpeg/decoder.ts";
-import { frameGeometry } from "../src/jpeg/geometry.ts";
-import { parseJpeg } from "../src/jpeg/parse.ts";
-
-const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
+import { transformJpeg } from "../../src/jpeg/codec.ts";
+import { decodeCoefficients } from "../../src/jpeg/decoder.ts";
+import { frameGeometry } from "../../src/jpeg/geometry.ts";
+import { parseJpeg } from "../../src/jpeg/parse.ts";
+import { bytesOf, loadManifest } from "../core/helpers.ts";
 
 interface ManifestEntry {
   file: string;
@@ -24,9 +20,8 @@ interface ManifestEntry {
   expect?: { read?: number; error?: string };
 }
 
-const manifest: { files: ManifestEntry[] } = JSON.parse(readFileSync(join(fixturesDir, "manifest.json"), "utf8"));
+const manifest = loadManifest<ManifestEntry>();
 const baseImages = manifest.files.filter((entry) => entry.file.startsWith("base/"));
-const bytesOf = (file: string): Buffer => readFileSync(join(fixturesDir, file));
 
 /** Every coefficient of every component, as a flat list, for comparison. */
 function coefficientsOf(

@@ -16,7 +16,7 @@ import {
   type OrientationTransform,
   transformFor,
   transformForRotation,
-} from "../src/orientation.ts";
+} from "../../src/orientation.ts";
 
 type Matrix = number[][];
 

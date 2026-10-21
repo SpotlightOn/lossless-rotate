@@ -13,20 +13,14 @@
  */
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
-
-import { transformJpeg } from "../src/jpeg/codec.ts";
-import { decodeCoefficients } from "../src/jpeg/decoder.ts";
-import { frameGeometry, isPerfectTransform, swapsAxes } from "../src/jpeg/geometry.ts";
-import { parseJpeg } from "../src/jpeg/parse.ts";
-import { ZIGZAG_TO_NATURAL } from "../src/jpeg/tables.ts";
-import { type OrientationPrimitive, transformFor } from "../src/orientation.ts";
-
-const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
-const bytesOf = (file: string): Buffer => readFileSync(join(fixturesDir, file));
+import { transformJpeg } from "../../src/jpeg/codec.ts";
+import { decodeCoefficients } from "../../src/jpeg/decoder.ts";
+import { frameGeometry, isPerfectTransform, swapsAxes } from "../../src/jpeg/geometry.ts";
+import { parseJpeg } from "../../src/jpeg/parse.ts";
+import { ZIGZAG_TO_NATURAL } from "../../src/jpeg/tables.ts";
+import { type OrientationPrimitive, transformFor } from "../../src/orientation.ts";
+import { bytesOf } from "../core/helpers.ts";
 
 const PRIMITIVES: OrientationPrimitive[] = [
   "none",

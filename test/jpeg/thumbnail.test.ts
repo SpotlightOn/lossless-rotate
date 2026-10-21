@@ -12,17 +12,11 @@
  */
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
-import { OrientError } from "../src/errors.ts";
-import { autoRotateBuffer, findExifApp1, readOrientation, transformFor, transformJpeg } from "../src/index.ts";
-import { decodeCoefficients } from "../src/jpeg/decoder.ts";
-import { parseJpeg } from "../src/jpeg/parse.ts";
-
-const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
-const bytesOf = (file: string): Buffer => readFileSync(join(fixturesDir, file));
+import { autoRotateBuffer, findExifApp1, readOrientation, transformFor, transformJpeg } from "../../src/index.ts";
+import { decodeCoefficients } from "../../src/jpeg/decoder.ts";
+import { parseJpeg } from "../../src/jpeg/parse.ts";
+import { bytesOf, errorCodeOf, loadManifest } from "../core/helpers.ts";
 
 interface ThumbnailMeta {
   tiffOffset: number;
@@ -52,7 +46,7 @@ interface Fixture {
   thumbnailError?: string;
 }
 
-const manifest: { files: Fixture[] } = JSON.parse(readFileSync(join(fixturesDir, "manifest.json"), "utf8"));
+const manifest = loadManifest<Fixture>();
 const thumbnailFixtures = manifest.files.filter((fixture) => fixture.kind === "thumbnail");
 const rotatable = thumbnailFixtures.filter((fixture) => fixture.thumbnailError === undefined);
 const brokenThumbnails = thumbnailFixtures.filter((fixture) => fixture.thumbnailError !== undefined);
@@ -161,17 +155,6 @@ function thumbnailOf(bytes: Uint8Array): { offset: number; length: number; bytes
 
 function coefficientsOf(bytes: Uint8Array): number[][] {
   return decodeCoefficients(parseJpeg(bytes)).map((component) => [...component.blocks]);
-}
-
-function errorCodeOf(run: () => unknown): string {
-  try {
-    run();
-  } catch (error) {
-    if (error instanceof OrientError) return error.code;
-    if (error instanceof Error) return `${error.name}: ${error.message}`;
-    return String(error);
-  }
-  return "<no error>";
 }
 
 // ---------------------------------------------------------------------------

@@ -19,12 +19,13 @@ Decisions taken with the maintainer:
 * **no native code**: no C/C++ addon, no `sharp`, no prebuilt binary, no compiler step;
 * **TypeScript**, shipped as source and executed through Node's native type stripping (no build);
 * **zero runtime dependencies**;
-* **orientation handling stays at the metadata/Exif level** — the tag is changed, the pixels are not;
+* **orientation handling stays at the metadata/Exif level** — for formats without a coefficient-domain
+  rotation (AVIF) the properties are changed, the pixels are not;
 * images whose dimensions are not MCU-aligned are transformed anyway with a warning (like `jpegtran`),
   with an opt-in error;
 * the JPEG standard (ITU-T T.81), the ISO base media file format and the Exif specification are
-  the reference, not another library's source. `jpegtran`/`djpeg` are used only as black-box oracles in
-  the tests.
+  the reference, not another library's source. `jpegtran`/`djpeg`/`avifenc`/`avifdec` are used only as
+  black-box oracles in the tests.
 
 Runtime floor: **Node.js ≥ 24** (follows from shipping `.ts`).
 
@@ -60,6 +61,9 @@ src/exif.ts              locate / read / patch / insert the Exif orientation ent
 src/file.ts              format dispatch, read and write on a path
 src/markers.ts           JPEG marker walker
 src/errors.ts            OrientError with stable codes
+src/avif/container.ts    ISOBMFF box walker and builder
+src/avif/item.ts         the item structure: meta/iprp/ipco/ipma/iloc, ipma parsing, meta rebuild
+src/avif/orientation.ts  the irot/imir properties of the primary item
 src/jpeg/parse.ts        JPEG structure: SOF/DHT/DQT/DRI/SOS and per-scan table snapshots
 src/jpeg/huffman.ts      canonical Huffman decoding/encoding and the entropy bit streams
 src/jpeg/decoder.ts      baseline and progressive entropy decoding -> coefficient grids
@@ -87,6 +91,9 @@ buffers.
   what a tag asks for, what a quarter turn is, and what two transforms in a row come to (one pass).
 * `locateExifThumbnail`, `replaceExifThumbnail` — the embedded Exif thumbnail (`0x0201`/`0x0202`) and
   the offset fixup that replacing it requires.
+* `isAvif`, `avifLayout`, `avifImageSize`, `avifPropertyTypes`, `readAvifOrientation`,
+  `writeAvifOrientation`, `setAvifOrientation` — the AVIF metadata layer (also reachable as
+  `@spotlighton/lossless-rotate/avif`).
 * `transformJpeg`, `parseJpeg`, `decodeCoefficients`, `frameGeometry`, `isPerfectTransform` — the
   layers below.
 
@@ -121,7 +128,7 @@ Two consequences that a naive implementation gets wrong:
 The rules were derived from the DCT definition and verified numerically: applying the rule to a block
 and comparing with a forward DCT of the literally rotated block gives an error of 0.0000 across all
 primitives (`/tmp/opencode/oracle` development scripts; the invariant is also covered by
-`test/jpeg-transform.test.ts`).
+`test/jpeg/transform.test.ts`).
 
 `src/orientation.ts` maps the eight Exif orientation values to these primitives:
 
@@ -215,16 +222,21 @@ native binary"; the decision was the own implementation.
 
 The claim "lossless" is only meaningful with evidence. Seven independent layers of it:
 
-1. **Coefficient round trip** (`test/jpeg-roundtrip.test.ts`). Decoding and re-encoding every base
+The suites are grouped by format: `test/core/` holds the format-agnostic parts (the orientation table
+and the public API contract) plus the shared fixture and CLI helpers, `test/jpeg/` and `test/avif/` hold
+the format-specific suites, and `test/fixtures/` is the shared corpus that both read.
+
+
+1. **Coefficient round trip** (`test/jpeg/roundtrip.test.ts`). Decoding and re-encoding every base
    image without a transform preserves every coefficient and the geometry.
 
-2. **Analytic transform checks** (`test/jpeg-transform.test.ts`). Every primitive is checked
+2. **Analytic transform checks** (`test/jpeg/transform.test.ts`). Every primitive is checked
    coefficient by coefficient against the rules of §4, the result geometry is checked, and the
    quantization-table transposition is verified exactly for the axis-swapping transforms. This test
    needs no external tool.
 
 3. **Differential test against the reference implementation**
-   (`test/jpeg-differential.test.ts`, skipped when `jpegtran`/`djpeg` are absent):
+   (`test/jpeg/differential.test.ts`, skipped when `jpegtran`/`djpeg` are absent):
    * for every **perfect** transform, the decoded result is **byte-identical** to `jpegtran`'s output —
      the strongest available statement, against a completely independent implementation;
    * for **imperfect** transforms the geometry matches `jpegtran`'s and a warning is emitted;
@@ -236,18 +248,27 @@ The claim "lossless" is only meaningful with evidence. Seven independent layers 
 4. **The fixture corpus is verified** (`scripts/make-fixtures.mjs` + `manifest.json`). The generator
    checks each base image's real frame (dimensions, sampling factors, progressive flag) and records it;
    the orientation fixtures are written from explicit byte arrays, so the tests never compare the
-   implementation with itself. `test/exif.test.ts` and `test/file.test.ts` assert, among other things,
+   implementation with itself. `test/jpeg/exif.test.ts` and `test/jpeg/file.test.ts` assert, among other things,
    that patching rewrites *exactly* the ten bytes of the IFD entry and nothing else.
 
-5. **The thumbnail fixup is verified against an independent reader** (`test/thumbnail.test.ts`). The
+5. **AVIF metadata is verified three ways** (`test/avif/orientation.test.ts`). The hand-built fixtures
+   describe the property list, the primary item and the `iloc` extent, and a file the writer produces
+   has to equal the hand-built one byte for byte for all eight orientations. On top of that, `avifenc`
+   is driven as an independent writer (`--irot`/`--imir`): the reader must read back what libavif wrote,
+   and the writer must reproduce libavif's output byte for byte. Finally `avifdec` must decode a written
+   file to the literal pixel rotation of the original (checked against ImageMagick's `-rotate`). The
+   external tests skip themselves when the tool is missing, like the JPEG differential tests.
+
+6. **The thumbnail fixup is verified against an independent reader** (`test/jpeg/thumbnail.test.ts`). The
    test carries its own TIFF/IFD walker (it follows the offsets itself to resolve `Make`, the thumbnail
    bounds and the orientation), so the offset fixup is never compared with the code that performs it.
    The corpus covers the layout combinations that matter, and the tests assert the two invariants that
    define "only the thumbnail changed": the main image's coefficients are identical with and without
    the option, and the file grew by exactly the change in thumbnail length.
 
-The CLI is covered separately (`test/cli.test.ts`), by running the real executable: it asserts that the
-default output lands in `tmp/` and that the input file is byte-for-byte unchanged.
+The CLI is covered separately — `test/jpeg/cli.test.ts` for JPEG, `test/avif/cli.test.ts` for AVIF — by
+running the real executable: it asserts that the default output lands in `tmp/` and that the input file
+is byte-for-byte unchanged.
 
 The one design decision the CLI needed from the library is `--rotate <deg>`. "Rotate by N degrees" is
 not what `rotate` does — it makes the image upright from the tag — so the explicit angle is *counted
@@ -290,7 +311,9 @@ image size, sampling factor and transform (0 mismatches).
 | error surface | numeric `legacyCode` | string `code` |
 | WebP orientation, read/write | not supported | deliberately not supported (§11): browsers ignore the Exif tag in WebP |
 | WebP rotation (`autoRotate`) | re-encoded via GraphicsMagick | `E_UNSUPPORTED_FORMAT`, a WebP is not a file this package handles |
-| non-JPEG file, file API | error −3 | `E_UNSUPPORTED_FORMAT` |
+| AVIF orientation, read/write | not supported | works: the `irot`/`imir` property, `meta`/`iloc` rebuilt |
+| AVIF rotation (`autoRotate`) | not supported | `E_UNSUPPORTED`, the property is the answer |
+| non-JPEG/AVIF file, file API | error −3 | `E_UNSUPPORTED_FORMAT` |
 
 ---
 
@@ -302,7 +325,25 @@ Out of scope for 0.6.0: non-JPEG formats, lossless crop/scale, thumbnail regener
 The embedded Exif thumbnail is rotated together with the main image (§12); that is not "thumbnail
 regeneration" — the thumbnail stays the same JPEG, only rotated losslessly.
 
+The AVIF container layer (§13) reads and writes the `irot`/`imir` properties of the primary item, with
+the property set and the `iloc` extents rebuilt around them. Metadata only, for the same reason — AV1
+has no coefficient-domain rotation — and byte-identical to `avifenc --irot/--imir`.
+
 WebP is deliberately not supported; §11 explains why.
+
+Planned next:
+
+1. **AVIF Exif item** — an AVIF may also carry the orientation in an embedded Exif item. libavif treats
+   `irot`/`imir` as the source of truth and normalises that tag to 1 (`avifImageExtractExifOrientationToIrotImir`),
+   so the property path (§13) already covers the files in the wild; reading the Exif item as a fallback
+   is a refinement, not a gap that changes behaviour.
+2. **Lossless *pixel* rotation for AVIF**, built on the same decode → transform → encode
+   skeleton. The codec front end is format specific, the transform layer is not: an AVIF is an AV1 still
+   image, whose coefficient domain is an integer transform (`Txfm`), so a rotation is again a coefficient
+   and block-grid rearrangement, with the same "perfect transform" question about block alignment instead
+   of MCU alignment.
+
+The goal is one transform core with pluggable per-format parse/decode/encode back ends.
 
 ---
 
@@ -314,8 +355,9 @@ the tag were absent, so a package whose promise is "makes images upright" would 
 nothing reads back. WebP is therefore treated like any other unsupported format: `E_UNSUPPORTED_FORMAT`
 at the file level, and `autoRotateBuffer` refuses it.
 
-The TIFF code a WebP layer would have reused (`src/exif.ts`) stays regardless, because the JPEG layer
-uses it.
+AVIF is the opposite case, which is why it *is* supported: `irot`/`imir` is defined by the specification
+*and* implemented by renderers (verified against Chromium). The TIFF code a WebP layer would have reused
+(`src/exif.ts`) stays regardless, because JPEG and AVIF use it too.
 
 ---
 
@@ -364,7 +406,7 @@ thumbnail is not a usable JPEG. Warnings from the inner transform are prefixed
 `the embedded Exif thumbnail: `, so a "progressive input" or "not MCU aligned" note is never mistaken
 for one about the main image. `thumbnailRotated` reports whether anything happened.
 
-Verification: `test/thumbnail.test.ts` reads the fixtures with its **own** TIFF/IFD walker (it follows
+Verification: `test/jpeg/thumbnail.test.ts` reads the fixtures with its **own** TIFF/IFD walker (it follows
 the offsets itself and resolves `Make` through them), so the fixup is never checked against the code
 that performs it. The corpus covers the usual layout, the shifted one, big endian, a `SHORT` length
 field, a thumbnail with its own Exif block, a progressive thumbnail, a non-MCU-aligned thumbnail, and
@@ -374,3 +416,121 @@ grew by exactly the difference in thumbnail length — i.e. that nothing else in
 
 ---
 
+## 13. AVIF: the metadata layer
+
+An AVIF file is an ISOBMFF box tree: an `ftyp` box naming an AVIF brand, a `meta` full box, and the
+compressed image data in `mdat`. The interesting part is the item structure inside `meta` (ISO/IEC
+14496-12 and 23008-12):
+
+```
+meta
+├── pitm   the primary item id (the one a viewer shows)
+├── iinf   item information (infe), e.g. the "av01" item
+├── iloc   where each item's data lives (extents, absolute or relative to a base offset)
+└── iprp
+    ├── ipco   the property boxes: ispe (size), av1C (codec config), colr, pixi, ... and irot / imir
+    └── ipma   which 1-based ipco indices apply to which item
+```
+
+Unlike Exif, the AVIF orientation is **not** a value in a metadata blob: it is the pair of `irot`
+(rotation) and `imir` (mirror) properties, and it only counts when the primary item's `ipma` entry
+associates it. `src/avif/container.ts` is the ISOBMFF layer (box walker, big-endian number helpers,
+box builder), `src/avif/item.ts` the item structure (`ipco`/`ipma`/`iloc` parsing and the `meta`
+rebuild), and `src/avif/orientation.ts` the property layer.
+
+### The property bytes
+
+Both properties are one byte (ISO/IEC 23008-12, MIAF):
+
+* `irot` — the counter-clockwise rotation in 90° steps sits in the low two bits (0..3); the upper bits
+  are reserved.
+* `imir` — the mirror axis sits in the least significant bit: `0` = top-to-bottom, `1` = left-to-right,
+  applied *after* the rotation.
+
+The eight Exif orientations map onto combinations of the two; `src/avif/orientation.ts` carries the
+tables, derived empirically from `avifenc` output and Chromium rendering:
+
+| angle (irot) | no mirror | `imir` axis 0 | `imir` axis 1 |
+| --- | --- | --- | --- |
+| 0 | 1 | 4 | 2 |
+| 1 | 8 | 5 | 7 |
+| 2 | 3 | 2 | 4 |
+| 3 | 6 | 7 | 5 |
+
+Reading: `avifLayout` walks the boxes down to `ipco`/`ipma` and reads `pitm` for the primary id;
+`propertyIndexOfType` finds the first `irot`/`imir`; `isAssociated` checks the primary item's `ipma`
+entry; `propertyByte` reads the transform bits. A property that exists but is not associated with the
+primary item is ignored, which is what `pitm` and `ipma` are for. A missing pair reads as `0`.
+
+For files, the file layer does **not** load the image data either: it reads only the eight-byte header
+of each top-level box to find `meta` (which usually sits in front of `mdat`), then reads the head of the
+file up to the end of that box and hands it to the in-memory parser; a file that stores `meta` behind
+the image data is read in full, which is correct but not cheaper. The walk still checks that the top level
+lines up with the end of the file, so trailing bytes fail here the same way they would in the buffer API.
+
+### Writing
+
+AVIF has no ten-byte patch path: a property is not an in-place field. The writer rebuilds `meta`:
+
+1. **Apply the property.** For each of `irot`/`imir`, `applyProperty` reuses the existing `ipco` box at
+   the same index (rewriting its body) or appends a new one. A property is **never removed from `ipco`**
+   — only its association is dropped — because removing a box would renumber every later `ipma` index.
+2. **Rebuild the primary item's association list.** Any existing `irot`/`imir` association is dropped
+   and the current ones appended (marked `essential: true`, as libavif writes them). A primary item with
+   no `ipma` entry at all gets one, so the transform cannot silently fail to apply.
+3. **The minimal property set**, matching `avifenc` byte for byte: `needsIrot = axis === null || angle !== 0`
+   and `needsImir = axis !== null`. So a pure mirror (orientations 2 and 4) carries **only** `imir` — an
+   explicit `irot 0` there would be redundant and would not match libavif — a rotation or the identity
+   carries `irot` (angle 0 for orientation 1), and the transpose/transverse (5 and 7) carry both.
+4. **Fix up `iloc`.** Growing `ipco`/`ipma` moves `meta` and therefore everything behind it, including
+   `mdat` when it follows. `rebuildMeta` shifts every `iloc` extent that sat at or behind the old `meta`
+   by the size change, so the extents keep pointing at the same image bytes (an extent in front of `meta`
+   needs no shift and gets none). The parser is told the shape by the box header rather than assuming one:
+   `item_ID` is 16 bits in version 0/1 but 32 bits in version 2, `construction_method` exists from version
+   1 on, and the base offset (its own width) is shifted alongside the extents — an extent addressed
+   relative to a base offset therefore stays correct too. Data stored in `idat` (`construction_method` 1)
+   is addressed relative to its own box and is not shifted.
+5. **Rewrite the whole file.** Because `meta` moved `mdat`, the file is written back in full (and
+   truncated) rather than patched; the image data is copied byte for byte.
+
+`writeAvifOrientation` returns the new bytes plus an `AvifPatchResult` (the `PatchResult` shape plus the
+`irot`/`imir` property indices, their byte offsets and whether `meta` had to be rebuilt).
+
+There is **no rotation** for AVIF: AV1 has no coefficient-domain transform, so `autoRotate` throws
+`E_UNSUPPORTED` and points at the properties. `orientation()`/`setOrientation()` dispatch on the
+container like for JPEG, `canTransform()` is `false`, and a broken box tree is
+`E_INVALID_AVIF` while a non-AVIF gets `E_UNSUPPORTED_FORMAT`.
+
+An AVIF **image sequence** (`avis`) is an AVIF container but not a still image: its pictures live in
+tracks and it has no item `meta` (`pitm`/`iloc`/`iprp`), so there is no `irot`/`imir` to read. `isAvif`
+accepts both brands (the file really is an AVIF), and `isAvifSequence` tells the track-based case apart —
+a file that names both brands is a still image. The orientation entry points reject a sequence with
+`E_UNSUPPORTED_FORMAT`; the file layer applies the same check before its box walk, which would otherwise
+fail first on the missing `meta`.
+
+### Reading tolerance
+
+Real files vary, so the reader accepts what the spec allows: `pitm` decides the primary item (1 when the
+box is absent), `ipma` may use 16-bit or wide (15-bit) associations and a version-1 32-bit item id, the
+properties may sit in `ipco` in any order, and both 32-bit and 64-bit box sizes are understood. What is
+*not* read yet is an orientation stored in an embedded Exif item; libavif treats `irot`/`imir` as the
+source of truth and normalises that tag to 1, so the property path covers the files in the wild (see the
+roadmap).
+
+### Verification
+
+Three independent angles, in `test/avif/orientation.test.ts`:
+
+* The hand-built fixtures in `test/fixtures/avif/` are assembled by `scripts/make-fixtures.mjs` from
+  explicit byte arrays (the same independent-implementation rule as for JPEG). The manifest
+  records the property list, the primary item, the `irot`/`imir` byte offsets and the `iloc` extent; the
+  tests assert that the writer reproduces the hand-built files **byte for byte** for all eight
+  orientations and that `iloc` keeps pointing at the untouched `mdat`. The corpus deliberately covers the
+  `iloc` flavours — version 1, version 2 (32-bit item id) and a base offset — because the writer rewrites
+  the extents and each shape has to be parsed the way it was written; the extent staying correct is
+  checked with an independent walker, not only by the writer reading its own output back.
+* `avifenc` is an independent writer oracle: for each orientation its `--irot`/`--imir` output must read
+  back to the matching value, and the writer must reproduce libavif's output byte for byte.
+* `avifdec` is a reader oracle: a file the writer touched must decode to the literal pixel rotation of
+  the original (compared with ImageMagick `-rotate`, 0 differing pixels). The external tests skip
+  themselves when the tools are missing.
