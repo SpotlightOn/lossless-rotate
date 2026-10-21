@@ -27,16 +27,20 @@ jobs:
         with:
           persist-credentials: false
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE }}
-          cache: npm
+          cache: pnpm
           # Writes the GitHub Packages registry and an NODE_AUTH_TOKEN into the npm config,
           # which is what `npm publish` (via publishConfig) picks up.
           registry-url: https://npm.pkg.github.com
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Verify the tag matches package.json
         run: |
@@ -49,9 +53,9 @@ jobs:
 
       - name: Lint, type check and test
         run: |
-          npm run lint
-          npm run typecheck
-          npm test
+          pnpm run lint
+          pnpm run typecheck
+          pnpm test
 
       - name: Publish to GitHub Packages
         run: npm publish

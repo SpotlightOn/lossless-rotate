@@ -348,10 +348,10 @@ See `DESIGN.md` for the full behaviour table and the verification evidence.
 ## Development
 
 ```sh
-npm test           # node --test  (118 tests)
-npm run typecheck  # tsc --noEmit
-npm run lint       # biome check .
-npm run lint:fix   # biome check --write .   (formats and sorts imports)
+pnpm test           # node --test  (118 tests)
+pnpm run typecheck  # tsc --noEmit
+pnpm run lint       # biome check .
+pnpm run lint:fix   # biome check --write .   (formats and sorts imports)
 ```
 
 Tests are grouped by format: `test/core/` covers the format-agnostic parts (the orientation table and
@@ -361,18 +361,18 @@ format-specific suites, and `test/fixtures/` is the corpus both read.
 Linting and formatting use [Biome](https://biomejs.dev); the configuration is in `biome.json`.
 
 Node's native type stripping **erases** types, it does not check them, so `typescript` is a
-devDependency for `npm run typecheck` (`tsc --noEmit`) only — nothing is ever compiled or emitted, and
+devDependency for `pnpm run typecheck` (`tsc --noEmit`) only — nothing is ever compiled or emitted, and
 consumers do not install it. `tsconfig.json` sets `erasableSyntaxOnly`, which makes `tsc` reject any
 syntax Node could not strip (enums, parameter properties, …), so "type checks" and "runs on Node" stay
 the same thing.
 
 The differential tests compare against `jpegtran`/`djpeg` and for AVIF against `avifenc`/`avifdec` and
 ImageMagick; the fixture generator additionally uses GraphicsMagick (`gm`) and `cjpeg`. All of them skip
-themselves when the tools are not on `PATH`, so `npm test` works everywhere. To regenerate the fixture
+themselves when the tools are not on `PATH`, so `pnpm test` works everywhere. To regenerate the fixture
 corpus:
 
 ```sh
-npm run fixtures  # needs gm, cjpeg, jpegtran
+pnpm run fixtures  # needs gm, cjpeg, jpegtran
 ```
 
 ## Releasing
