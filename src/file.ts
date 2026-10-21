@@ -61,6 +61,10 @@ async function withHandle<T>(path: string, flags: string, run: (handle: FileHand
     throw cantOpenCause(cause);
   }
   try {
+    // Windows opens a directory and reads zero bytes from it, so "this is not a file" has to be
+    // checked explicitly; otherwise a directory would surface as E_UNSUPPORTED_FORMAT instead of
+    // the E_CANT_OPEN the POSIX path produces (EISDIR).
+    if (!(await handle.stat()).isFile()) throw cantOpenCause(new Error(`${path} is not a regular file`));
     return await run(handle);
   } catch (error) {
     // A read/write failure on an open file keeps the v1 "E_CANT_OPEN" meaning for its -1 result,
