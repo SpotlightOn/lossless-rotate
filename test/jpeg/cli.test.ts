@@ -176,6 +176,61 @@ test("--rotate rejects angles that are not a quarter turn", (t) => {
   assert.match(onSet.stderr, /--rotate only applies to the "rotate" command/);
 });
 
+test("--crop keeps only the requested rectangle, after the rotation", (t) => {
+  const space = scratch(t);
+  const upright = join(fixturesDir, "orient-64x48-420-01.jpg");
+
+  // Without --rotate it is a plain lossless crop.
+  const plain = run(["rotate", upright, "--crop", "32x16+16+16", "-o", "cropped.jpg"], space);
+  assert.equal(plain.status, 0);
+  assert.match(plain.stdout, /\(none, orientation 1 => 1, cropped to 32x16\+16\+16\)/);
+  assert.match(run(["info", join(space, "cropped.jpg")], space).stdout, /size\s+32x16/);
+
+  // With --rotate the region counts from the image as it is displayed, i.e. after the turn.
+  const turned = run(["rotate", upright, "--rotate", "90", "--crop", "16x32+0+16", "-o", "turned.jpg"], space);
+  assert.equal(turned.status, 0);
+  assert.match(turned.stdout, /\(rotate90, .*cropped to 16x32\+0\+16\)/);
+  // 64x48 turned by 90 is 48x64.
+  assert.match(run(["info", join(space, "turned.jpg")], space).stdout, /size\s+16x32/);
+
+  // A crop is a change even when the image is already upright, so it must still be written.
+  const already = run(["rotate", join(fixturesDir, "lenna.jpg"), "--crop", "16x16+0+0"], space);
+  assert.equal(already.status, 0);
+  assert.match(already.stdout, /cropped to 16x16\+0\+0/);
+  assert.doesNotMatch(already.stdout, /nothing written/);
+});
+
+test("--crop refuses a region it cannot honour instead of cropping somewhere else", (t) => {
+  const space = scratch(t);
+  const file = join(fixturesDir, "orient-64x48-420-01.jpg");
+
+  for (const spec of ["32x16", "32x16+16", "0x16+0+0", "abc", "32x16+16+16+"]) {
+    const result = run(["rotate", file, "--crop", spec], space);
+    assert.equal(result.status, 1, `--crop ${spec} must be refused`);
+    assert.match(result.stderr, /--crop/, `--crop ${spec}`);
+  }
+
+  // A region that does not fit into the image is a library error, reported with its code.
+  const tooBig = run(["rotate", file, "--crop", "64x64+0+0"], space);
+  assert.equal(tooBig.status, 1);
+  assert.match(tooBig.stderr, /^E_INVALID_VALUE: crop region 64x64\+0\+0 does not fit into the 64x48 image/);
+
+  // An origin off the MCU grid is rounded down with a warning, and refused by --strict.
+  const rounded = run(["rotate", file, "--crop", "20x20+5+3", "-o", "rounded.jpg"], space);
+  assert.equal(rounded.status, 0);
+  assert.match(rounded.stderr, /warning: the crop region 20x20\+5\+3 does not start on the MCU grid/);
+  assert.match(run(["info", join(space, "rounded.jpg")], space).stdout, /size\s+25x23/);
+
+  const strict = run(["rotate", file, "--crop", "20x20+5+3", "--strict"], space);
+  assert.equal(strict.status, 1);
+  assert.match(strict.stderr, /^E_UNSUPPORTED: the crop region 20x20\+5\+3 does not start on the MCU grid/);
+
+  // The metadata-only commands must not pretend to have cropped anything.
+  const onSet = run(["set", file, "6", "--crop", "32x16+16+16"], space);
+  assert.equal(onSet.status, 1);
+  assert.match(onSet.stderr, /--crop only applies to the "rotate" command/);
+});
+
 test("set writes only the tag, and the image data stays untouched", (t) => {
   const space = scratch(t);
   const file = join(fixturesDir, "lenna.jpg"); // no Exif at all: the tag has to be added

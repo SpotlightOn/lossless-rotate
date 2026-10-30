@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Command line front end for the package: look at a file, make a JPEG upright, write an orientation
- * tag, or pull the embedded Exif thumbnail out.
+ * Command line front end for the package: look at a file, make a JPEG upright, crop one, write an
+ * orientation tag, or pull the embedded Exif thumbnail out.
  *
  * Nothing here is needed for the library to work; this is the quick way to see what the codec does
  * to a real file. Every command writes into `tmp/` unless an output path is given (`-o`), so trying
@@ -20,8 +20,10 @@ import {
   avifImageSizeFromBuffer,
   avifLayout,
   avifPropertyTypes,
+  type CropRegion,
   canTransform,
   composeTransforms,
+  cropRegionToString,
   findExifApp1,
   isAvif,
   isIdentity,
@@ -76,8 +78,9 @@ Options:
   -o, --output <path>    output file, or a directory when there are several inputs (default: ${DEFAULT_OUTPUT_DIR}/)
   -r, --rotate <deg>     turn the image by 90, 180 or 270 degrees clockwise on top of the stored
                          orientation, which is cleared afterwards (270 turns the other way; JPEG only)
+  -c, --crop <spec>      keep only WxH+X+Y of the image, counted after the rotation (JPEG only)
   -t, --thumbnail        rotate the embedded Exif thumbnail together with the image (rotate)
-      --strict           refuse a transform that cannot be perfect (rotate)
+      --strict           refuse a transform or crop that cannot be exact (rotate)
       --drop-metadata    do not keep the APPn/COM segments (rotate)
       --json             print the result as JSON
   -q, --quiet            print nothing but errors and warnings
@@ -89,14 +92,20 @@ file already carries (90, 180 or 270 degrees, or a mirror). With --rotate <deg> 
 a fixed amount instead, counted from the way it is displayed. There is nothing to compute by hand -
 the orientation says it, and "info" prints it.
 
-AVIF pixels are never rotated: the AV1 bitstream has no lossless transform, so "set" writes the
-orientation instead (an irot/imir property) and "rotate" refuses them.
+"--crop" takes the same rectangle jpegtran's -crop takes: WxH+X+Y, from the top left corner. It is
+applied after the rotation, so X and Y count from the corner of the upright image. Cropping cuts whole
+blocks, so a crop whose origin is not on the MCU grid is rounded down to it (and reported); --strict
+refuses it instead. --crop works without --rotate as well, which is a plain lossless crop.
+
+AVIF pixels are never rotated or cropped: the AV1 bitstream has no lossless transform, so "set" writes
+the orientation instead (an irot/imir property) and "rotate" refuses them.
 
 Examples:
   lossless-rotate info photo.jpg
   lossless-rotate info photo.avif
   lossless-rotate rotate photo.jpg --thumbnail
   lossless-rotate rotate photo.jpg --rotate 90
+  lossless-rotate rotate photo.jpg --crop 640x480+160+120
   lossless-rotate rotate *.jpg -o upright/
   lossless-rotate set photo.jpg 6 -o tagged/photo.jpg
   lossless-rotate set photo.avif 6
@@ -106,6 +115,7 @@ Examples:
 interface Options {
   output?: string;
   rotation?: Rotation;
+  crop?: CropRegion;
   thumbnail: boolean;
   strict: boolean;
   dropMetadata: boolean;
@@ -271,6 +281,8 @@ interface Outcome {
   /** Orientation written to the result, `null` when nothing was written. */
   target: number | null;
   perfect: boolean;
+  /** The crop region that was produced, when one was asked for. */
+  crop?: CropRegion;
   thumbnailRotated: boolean;
   warnings: string[];
   copied: boolean;
@@ -282,6 +294,7 @@ function uprightOutcome(source: Buffer, options: Options): Outcome {
     rotateThumbnail: options.thumbnail,
     onImperfect: options.strict ? "error" : "warn",
     keepMetadata: !options.dropMetadata,
+    ...(options.crop === undefined ? {} : { crop: options.crop }),
   });
   return {
     bytes,
@@ -289,6 +302,7 @@ function uprightOutcome(source: Buffer, options: Options): Outcome {
     orientation: result.orientation,
     target: result.copied ? null : 1,
     perfect: result.perfect,
+    ...(result.crop === undefined ? {} : { crop: result.crop.region }),
     thumbnailRotated: result.thumbnailRotated,
     warnings: result.warnings,
     copied: result.copied,
@@ -308,7 +322,8 @@ function turnedOutcome(source: Buffer, options: Options): Outcome {
 
   const orientation = readOrientation(source);
   const combined = composeTransforms(transformFor(orientation === 0 ? 1 : orientation), transformForRotation(rotation));
-  if (isIdentity(combined)) {
+  // A crop is still a change, so it is not a reason to copy the file untouched.
+  if (isIdentity(combined) && options.crop === undefined) {
     return {
       bytes: Buffer.from(source),
       transform: "none",
@@ -329,6 +344,7 @@ function turnedOutcome(source: Buffer, options: Options): Outcome {
     mcuAlignedOnly: options.strict,
     keepMetadata: !options.dropMetadata,
     rotateThumbnail: options.thumbnail,
+    ...(options.crop === undefined ? {} : { crop: options.crop }),
   });
   return {
     bytes: outcome.bytes,
@@ -336,6 +352,7 @@ function turnedOutcome(source: Buffer, options: Options): Outcome {
     orientation,
     target: orientation === 0 ? null : 1,
     perfect: outcome.perfect,
+    ...(outcome.crop === undefined ? {} : { crop: outcome.crop.region }),
     thumbnailRotated: outcome.thumbnailRotated,
     warnings: outcome.warnings,
     copied: false,
@@ -379,9 +396,24 @@ function describeOutcome(outcome: Outcome): string {
   const parts: string[] = [outcome.transform];
   if (outcome.orientation === 0) parts.push("no orientation tag");
   else parts.push(`orientation ${outcome.orientation} => ${outcome.target ?? "unchanged"}`);
+  if (outcome.crop !== undefined) parts.push(`cropped to ${cropRegionToString(outcome.crop)}`);
   if (outcome.thumbnailRotated) parts.push("thumbnail rotated");
   if (!outcome.perfect) parts.push("NOT perfect");
   return parts.join(", ");
+}
+
+/**
+ * `--crop` in jpegtran's notation, `WxH+X+Y`, counted from the top left corner. Anything else is a
+ * mistake worth saying out loud: silently cropping somewhere else would be worse than failing.
+ */
+function parseCropRegion(value: string): CropRegion {
+  const match = /^(\d+)x(\d+)\+(\d+)\+(\d+)$/.exec(value.trim());
+  if (match === null) {
+    throw new Error(`--crop needs WxH+X+Y (for example 640x480+160+120), got "${value}"`);
+  }
+  const [width, height, x, y] = [Number(match[1]), Number(match[2]), Number(match[3]), Number(match[4])];
+  if (width < 1 || height < 1) throw new Error(`--crop needs a region of at least 1x1 pixels, got "${value}"`);
+  return { x, y, width, height };
 }
 
 /**
@@ -444,6 +476,7 @@ function main(): number {
     options: {
       output: { type: "string", short: "o" },
       rotate: { type: "string", short: "r" },
+      crop: { type: "string", short: "c" },
       thumbnail: { type: "boolean", short: "t" },
       strict: { type: "boolean" },
       "drop-metadata": { type: "boolean" },
@@ -476,6 +509,7 @@ function main(): number {
   };
   if (typeof values.output === "string") options.output = values.output;
   if (typeof values.rotate === "string") options.rotation = parseRotation(values.rotate);
+  if (typeof values.crop === "string") options.crop = parseCropRegion(values.crop);
 
   const [command, ...rest] = positionals;
   switch (command) {
@@ -485,8 +519,10 @@ function main(): number {
       return commandRotate(options, rest);
     case "set":
     case "thumbnail":
-      // Both write metadata only; silently ignoring --rotate would look like it had been applied.
+      // Both write metadata only; silently ignoring --rotate or --crop would look like it had been
+      // applied.
       if (options.rotation !== undefined) throw new Error(`--rotate only applies to the "rotate" command`);
+      if (options.crop !== undefined) throw new Error(`--crop only applies to the "rotate" command`);
       return command === "set" ? commandSet(options, rest) : commandThumbnail(options, rest);
     default:
       process.stderr.write(`unknown command "${command}"\n\n${USAGE}`);

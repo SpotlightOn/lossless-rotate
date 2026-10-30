@@ -16,6 +16,7 @@ import { setAvifOrientation } from "./avif/orientation.ts";
 import { cantOpenCause, OrientError } from "./errors.ts";
 import { insertOrientation, readOrientation } from "./exif.ts";
 import { transformJpeg } from "./jpeg/codec.ts";
+import type { CropRegion } from "./jpeg/geometry.ts";
 import { isIdentity, type OrientationPrimitive, transformFor } from "./orientation.ts";
 
 export interface AutoRotateOptions {
@@ -40,6 +41,15 @@ export interface AutoRotateOptions {
    * promises a matching thumbnail, and a stale one would be a silent mismatch.
    */
   rotateThumbnail?: boolean;
+  /**
+   * Crop the result to this region, in the coordinates of the image as it is seen *after* the
+   * rotation - the same way jpegtran counts `-crop`. Transform and crop are one decode/encode pass,
+   * so the image is never encoded twice.
+   *
+   * The thumbnail is not cropped (a crop cannot be scaled down losslessly) and `warnings` says so.
+   * A region whose origin is not on the MCU grid needs `onImperfect: "warn"` (the default).
+   */
+  crop?: CropRegion;
 }
 
 export interface AutoRotateResult {
@@ -47,10 +57,12 @@ export interface AutoRotateResult {
   orientation: number;
   /** Transform that was applied. */
   transform: OrientationPrimitive;
-  /** False when the transform could not be perfect (see `warnings`). */
+  /** False when the transform or the crop region was not exactly achievable (see `warnings`). */
   perfect: boolean;
   width: number;
   height: number;
+  /** The crop that was applied, when `crop` was given. */
+  crop?: { requested: CropRegion; region: CropRegion };
   /** True when the embedded Exif thumbnail was transformed as well. */
   thumbnailRotated: boolean;
   /** Anything the caller should know about the result. */
@@ -59,7 +71,7 @@ export interface AutoRotateResult {
   copied: boolean;
 }
 
-/** Rotates a JPEG buffer so that it is upright. */
+/** Rotates a JPEG buffer so that it is upright, optionally cropping it in the same pass. */
 export function autoRotateBuffer(
   bytes: Uint8Array,
   options: AutoRotateOptions = {},
@@ -73,8 +85,9 @@ export function autoRotateBuffer(
   }
 
   const orientation = readOrientation(bytes);
+  const transform = transformFor(orientation === 0 ? 1 : orientation);
 
-  if (orientation === 0 || isIdentity(transformFor(orientation))) {
+  if (options.crop === undefined && isIdentity(transform)) {
     // Nothing to do: never re-encode an image that is already upright. v1 re-encoded it anyway.
     return {
       result: {
@@ -91,9 +104,9 @@ export function autoRotateBuffer(
     };
   }
 
-  const transform = transformFor(orientation);
   const outcome = transformJpeg(bytes, {
     primitive: transform.primitive,
+    crop: options.crop,
     orientationInOutput: options.orientationInOutput ?? 1,
     mcuAlignedOnly: options.onImperfect === "error",
     keepMetadata: options.keepMetadata !== false,
@@ -107,6 +120,7 @@ export function autoRotateBuffer(
       perfect: outcome.perfect,
       width: outcome.width,
       height: outcome.height,
+      ...(outcome.crop === undefined ? {} : { crop: outcome.crop }),
       thumbnailRotated: outcome.thumbnailRotated,
       warnings: outcome.warnings,
       copied: false,
