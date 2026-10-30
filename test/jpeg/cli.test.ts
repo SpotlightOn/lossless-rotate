@@ -25,7 +25,7 @@ test("--version and --help work without a command, and no command is an error", 
 
   const help = run(["--help"], space);
   assert.equal(help.status, 0);
-  assert.match(help.stdout, /^lossless-rotate - make JPEGs upright/);
+  assert.match(help.stdout, /^lossless-rotate - lossless rotate & crop/);
 
   const nothing = run([], space);
   assert.equal(nothing.status, 1);
@@ -89,7 +89,7 @@ test("rotate --thumbnail reports the thumbnail, and an upright image is not writ
   const before = readdirSync(join(space, "tmp"));
   const upright = run(["rotate", join(fixturesDir, "lenna.jpg")], space);
   assert.equal(upright.status, 0);
-  assert.match(upright.stdout, /already upright, nothing written/);
+  assert.match(upright.stdout, /already correctly oriented, nothing written/);
   assert.deepEqual(readdirSync(join(space, "tmp")), before, "nothing new is written for an upright image");
 });
 

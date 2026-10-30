@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file. The format foll
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.0] - 2026-10-30
 
 ### Added
 
@@ -14,9 +14,14 @@ All notable changes to this project are documented in this file. The format foll
 - `transformJpeg({ crop })`, `cropGeometry`, `cropRegionToString` and `crop` on `autoRotate`'s options,
   plus unit and differential tests against `jpegtran -crop`.
 
+### Changed
+
+- **Breaking:** `orientation()` is promise-only. The callback overload is gone;
+  `await orientation(file)` and `await orientation(file, value)` are unchanged.
+
 ## [0.6.0] - 2026-10-21
 
-Early stage, nothing released yet. Successor to `jpegorientation` v1: same task, no native code, no
+Early stage, nothing released yet. Rotation and orientation handling with no native code and no
 re-encoding.
 
 ### Added

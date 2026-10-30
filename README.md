@@ -5,10 +5,14 @@
 [![Node](https://img.shields.io/badge/node-%E2%89%A524-brightgreen)](https://nodejs.org)
 [![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
-Make JPEGs upright or cut a rectangle out of them — in the DCT domain, so **not a single pixel is re-encoded**.
+Lossless rotate & crop for JPEGs — in the DCT domain, so **not a single pixel is re-encoded**.
+
+> **A note on the name.** The package is called `@chimok/lossless-rotate`, but it no longer only
+> rotates: since 0.7.0 it also crops losslessly. Sorry for the name.
 
 This is a pure TypeScript version of `jpegtran`. There is also a WASM version, which is better tested:
-[`@chimok/jpegtran-js`](https://www.npmjs.com/package/@chimok/jpegtran-js).
+[`@chimok/jpegtran-js`](https://www.npmjs.com/package/@chimok/jpegtran-js). For JPEG XL there i've build a wasm version: [`@chimok/jxltran-js`](https://www.npmjs.com/package/@chimok/jxltran-js).
+
 
 The AVIF `irot`/`imir` properties are defined by the HEIF standard,
 [ISO/IEC 23008-12](https://www.iso.org/standard/83650.html), and listed for AVIF in the
@@ -63,22 +67,16 @@ await orientation("IMG_0001.jpg");        // -> 6 (0 when there is no tag)
 await orientation("IMG_0001.jpg", 1);     // metadata only, still lossless
 ```
 
-The v1 callback style keeps working:
-
-```js
-orientation("IMG_0001.jpg", (error, value) => { /* ... */ });
-```
-
-### Make an image upright
+### Rotate a JPEG losslessly
 
 ```js
 import { autoRotate } from "@chimok/lossless-rotate";
 
-const result = await autoRotate("IMG_0001.jpg", "upright.jpg");
+const result = await autoRotate("IMG_0001.jpg", "rotated.jpg");
 // result.orientation -> 6        (the value that was stored in the source)
 // result.transform   -> "rotate90"
 // result.perfect     -> true
-// result.copied      -> false    (true when the image was already upright)
+// result.copied      -> false    (true when the image was already correctly oriented)
 // result.warnings    -> []
 ```
 
@@ -111,7 +109,7 @@ import { crop, cropBuffer } from "@chimok/lossless-rotate";
 await crop("IMG_0001.jpg", { x: 160, y: 120, width: 640, height: 480 }, "crop.jpg");
 const { bytes } = cropBuffer(source, { x: 0, y: 0, width: 800, height: 600 });
 
-// Same pass as a rotation; the rectangle counts in the upright image.
+// Same pass as a rotation; the rectangle counts in the rotated image.
 await autoRotate("IMG_0001.jpg", "out.jpg", { crop: { x: 0, y: 0, width: 1200, height: 900 } });
 ```
 
@@ -128,7 +126,7 @@ await orientation("photo.avif");        // -> 6, from the irot/imir properties (
 await orientation("photo.avif", 1);     // writes irot 0 explicitly, the image data is untouched
 await orientation("plain.avif", 6);     // adds an irot property (and repairs iloc) when there is none
 
-await autoRotate("photo.avif", "upright.avif");  // throws E_UNSUPPORTED
+await autoRotate("photo.avif", "rotated.avif");  // throws E_UNSUPPORTED
 canTransform(avifBytes);                          // false
 setOrientation(avifBytes, 6);                     // Buffer in, Buffer out
 ```
@@ -137,7 +135,7 @@ The details that matter:
 
 - **No rotation.** AV1 has no coefficient-domain transform, so `autoRotate`/`autoRotateBuffer` raise
   `E_UNSUPPORTED` and point at the properties; every renderer (Chrome, Firefox, libavif-based tooling)
-  honours them, so the image still appears upright.
+  honours them, so the image still appears correctly oriented.
 - **The property set is the minimal one libavif writes**: a pure mirror (2/4) carries only `imir`, a
   rotation or the identity carries `irot` (with angle 0 for orientation 1), and a transpose/transverse
   (5/7) carries both. For all eight orientations the output is byte-identical to `avifenc
@@ -160,7 +158,7 @@ The details that matter:
 ```js
 await autoRotate(source, destination, {
   onImperfect: "warn",    // "warn" (default) or "error"
-  orientationInOutput: 1, // value written to the result, default 1 (upright)
+  orientationInOutput: 1, // value written to the result, default 1 (correctly oriented)
   keepMetadata: true,     // carry APPn/COM segments over, default true
   rotateThumbnail: false, // rotate the embedded Exif thumbnail too, default false
   crop: { x: 0, y: 0, width: 1200, height: 900 }, // optional, counted after the rotation
@@ -179,7 +177,7 @@ leaves it lying the wrong way up.
 `rotateThumbnail: true` applies the same transform to that thumbnail as well:
 
 ```js
-const { result } = await autoRotate("IMG_0001.jpg", "upright.jpg", { rotateThumbnail: true });
+const { result } = await autoRotate("IMG_0001.jpg", "rotated.jpg", { rotateThumbnail: true });
 // result.thumbnailRotated -> true   (false when there was no thumbnail, or nothing to rotate)
 ```
 
@@ -206,10 +204,10 @@ The package ships a small CLI for looking at and fixing files without writing an
 
 ```sh
 npx lossless-rotate info photo.jpg                 # container, orientation, size, thumbnail
-npx lossless-rotate rotate photo.jpg --thumbnail   # make upright, thumbnail included
+npx lossless-rotate rotate photo.jpg --thumbnail   # rotate losslessly, thumbnail included
 npx lossless-rotate rotate photo.jpg --rotate 90   # turn it 90 degrees clockwise
 npx lossless-rotate rotate photo.jpg --crop 640x480+160+120  # keep that rectangle (after the turn)
-npx lossless-rotate rotate *.jpg -o upright/       # several files into a directory
+npx lossless-rotate rotate *.jpg -o rotated/       # several files into a directory
 npx lossless-rotate set photo.jpg 6                # write the orientation only, no re-encode
 npx lossless-rotate set photo.avif 6               # ... also for AVIF
 npx lossless-rotate thumbnail photo.jpg            # extract the embedded Exif thumbnail
@@ -218,11 +216,11 @@ npx lossless-rotate thumbnail photo.jpg            # extract the embedded Exif t
 | Command | What it does |
 | --- | --- |
 | `info <file>` | Prints the format, orientation, size, sampling, the transform that would be applied, and (for JPEG) whether an Exif thumbnail is embedded and can be rotated. `--json` prints the same as JSON. |
-| `rotate <file...>` | Makes JPEGs upright (lossless). `--thumbnail` rotates the embedded thumbnail too, `--crop WxH+X+Y` keeps only that rectangle, `--strict` refuses imperfect transforms and unaligned crops, `--drop-metadata` drops APPn/COM. Refuses AVIF (`E_UNSUPPORTED`). |
+| `rotate <file...>` | Rotates JPEGs losslessly. `--thumbnail` rotates the embedded thumbnail too, `--crop WxH+X+Y` keeps only that rectangle, `--strict` refuses imperfect transforms and unaligned crops, `--drop-metadata` drops APPn/COM. Refuses AVIF (`E_UNSUPPORTED`). |
 | `set <file> <orientation>` | Writes the orientation only — the Exif tag for JPEG, the `irot`/`imir` property for AVIF; the image data is copied untouched (a minimal Exif block is added when there is none). |
 | `thumbnail <file>` | Extracts the embedded Exif thumbnail as a JPEG. Exits `1` when there is none. |
 
-**`rotate` takes no angle.** Making an image upright is not "turn it by N degrees": how far to turn is
+**`rotate` takes no angle.** Rotating an image is not "turn it by N degrees": how far to turn is
 read from the orientation tag the file already carries (90, 180 or 270, or a mirror). `info` prints it,
 `rotate` applies it. There is nothing to work out by hand:
 
@@ -298,7 +296,7 @@ A crop has the mirrored constraint — its **origin** has to be on the MCU grid,
   baseline JPEG, with the source's quantization tables. A warning says so. Progressive output is out
   of scope.
 - **Restart markers are dropped** (always legal); a warning says so.
-- **An already upright image is copied byte-for-byte**, never re-encoded; so is a crop of the whole image.
+- **An already correctly oriented image is copied byte-for-byte**, never re-encoded; so is a crop of the whole image.
 - **Images without Exif are not touched** by `autoRotateBuffer`; it reports orientation `0` and copies.
 
 ## Errors
@@ -363,26 +361,11 @@ plus an `AvifPatchResult` (the `PatchResult` shape plus the `irot`/`imir` proper
 offsets, and whether `meta` had to be rebuilt).
 
 
-## Migrating from `jpegorientation` v1
-
-- The C++ addon and the `gm`/GraphicsMagick dependency are gone; the whole package is pure
-  JavaScript/TypeScript with no dependencies.
-- `orientation(source, [value], [callback])` keeps its shape and still returns a promise.
-- Reading a file **without** Exif now returns `0` instead of throwing; writing to a file without an
-  orientation tag raises `E_INVALID_EXIF` instead of silently doing nothing.
-- `autoRotate` is now lossless. An already upright image is copied instead of re-encoded.
-- More layouts are understood (APP2/ICC before APP1, XMP before Exif, 32-bit IFD0 offsets, …).
-- AVIF files are handled too: `orientation()` reads and writes the primary item's `irot`/`imir`
-  properties, adding them when the file has none. `autoRotate` refuses to rotate them as well.
-- `orientationToString` is still exported. `legacyCode` error numbers are gone; use `code`.
-
-See `DESIGN.md` for the full behaviour table and the verification evidence.
-
 ## Development
 
 ```sh
 pnpm build          # tsc -p tsconfig.build.json -> dist/
-pnpm test           # node --test  (133 tests)
+pnpm test           # node --test  (131 tests)
 pnpm run typecheck  # tsc --noEmit
 pnpm run lint       # biome check .
 pnpm run lint:fix   # biome check --write .   (formats and sorts imports)
@@ -437,11 +420,11 @@ repository owner's scope instead, so there is no single name that could be publi
 0.6.0 is the released version: JPEG rotation with the Exif thumbnail, plus AVIF orientation as the
 primary item's `irot`/`imir` properties. The next version adds lossless crop (see
 [Crop a JPEG](#crop-a-jpeg)). WebP is deliberately out of scope — browsers ignore its Exif orientation
-tag (see [DESIGN.md §11](DESIGN.md#11-why-webp-is-not-supported)). Still open:
+tag (see [DESIGN.md §10](DESIGN.md#10-why-webp-is-not-supported)). Still open:
 
 1. **AVIF Exif item**: an AVIF can also carry its orientation in an embedded Exif item. libavif treats
    `irot`/`imir` as the source of truth and normalises that tag to 1, so the property path already
-   covers virtually every file; reading the Exif item is a later refinement. See `DESIGN.md` §10.
+   covers virtually every file; reading the Exif item is a later refinement. See `DESIGN.md` §9.
 2. **Lossless pixel rotation for AVIF** (the AV1 coefficient domain) on top of the existing
    decode → transform → encode skeleton — if it turns out to be worth the complexity.
 

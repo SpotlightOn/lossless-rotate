@@ -1,9 +1,8 @@
 /**
  * Mapping from an EXIF orientation value to the transform that makes the image upright.
  *
- * This table is the only thing the v1 code got right by hand (`lib/autoRotate.js` mapped the eight
- * cases onto GraphicsMagick calls). It is kept here as pure data so the codec layer of Phase 2 can
- * consume it, and so it can be verified analytically without any image library.
+ * The table is kept as pure data so the codec layer can consume it, and so it can be verified
+ * analytically without any image library.
  *
  * Both representations are exposed: a primitive (what a lossless DCT-domain transform wants, e.g.
  * jpegtran's `-transpose`) and the equivalent "rotate, then mirror" composition (what a

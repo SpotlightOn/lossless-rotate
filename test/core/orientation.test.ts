@@ -136,10 +136,10 @@ test("orientation 6 is the rotate-90-clockwise case and 1 is the identity", () =
   assert.equal(isIdentity(transformFor(6)), false);
 });
 
-test("the table matches the v1 mapping", () => {
-  // The v1 implementation mapped: 2 -> flop, 3 -> rotate 180, 4 -> flip, 5 -> rotate 90 + flop, 6 -> rotate 90,
-  //     7 -> rotate 270 + flop, 8 -> rotate 270
-  const legacy: Record<number, string> = {
+test("the table matches the documented mapping", () => {
+  // 2 -> flop, 3 -> rotate 180, 4 -> flip, 5 -> rotate 90 + flop, 6 -> rotate 90, 7 -> rotate 270 + flop,
+  // 8 -> rotate 270
+  const expected: Record<number, string> = {
     1: "",
     2: "flop",
     3: "rot180",
@@ -157,7 +157,7 @@ test("the table matches the v1 mapping", () => {
     if (transform.rotate === 270) parts.push("rot270");
     if (transform.flipHorizontal) parts.push("flop");
     if (transform.flipVertical) parts.push("flip");
-    assert.equal(parts.join("+"), legacy[orientation], `orientation ${orientation}`);
+    assert.equal(parts.join("+"), expected[orientation], `orientation ${orientation}`);
   }
 });
 

@@ -1,8 +1,8 @@
 /**
  * Minimal JPEG marker layer.
  *
- * Replaces the hand-rolled `fopen`/`getc` scanner of the v1 C addon. Only leading segments are
- * interesting here: everything from the start of scan (SOS) onwards is entropy-coded image data.
+ * Only leading segments are interesting here: everything from the start of scan (SOS) onwards is
+ * entropy-coded image data.
  */
 
 import { OrientError } from "./errors.ts";
@@ -122,8 +122,8 @@ export interface ExifSegment {
 /**
  * Finds the first APP1 segment whose payload starts with the "Exif\0\0" signature.
  *
- * Unlike v1 this walks every leading segment, so files with an ICC APP2 chunk or an XMP APP1
- * before the Exif block are handled correctly (v1 only accepted APP0/JFIF followed by APP1).
+ * Every leading segment is walked, so files with an ICC APP2 chunk or an XMP APP1 before the Exif
+ * block are handled correctly (a scanner that expects APP0/JFIF then APP1 would fail).
  */
 export function findExifApp1(buffer: Uint8Array): ExifSegment | null {
   for (const segment of jpegSegments(buffer)) {

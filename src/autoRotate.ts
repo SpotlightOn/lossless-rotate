@@ -88,7 +88,7 @@ export function autoRotateBuffer(
   const transform = transformFor(orientation === 0 ? 1 : orientation);
 
   if (options.crop === undefined && isIdentity(transform)) {
-    // Nothing to do: never re-encode an image that is already upright. v1 re-encoded it anyway.
+    // Nothing to do: never re-encode an image that is already upright.
     return {
       result: {
         orientation,

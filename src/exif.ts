@@ -2,19 +2,17 @@
  * EXIF orientation: read it, patch it in place, add it if missing.
  *
  * Written against the Exif 2.3 specification (TIFF header, IFD0, tag 0x0112) and JP 2.3 (the APP1
- * segment layout), so it is a from-scratch pure-JavaScript implementation with no native code. The
- * parsing rules deliberately follow what the v1 package accepted and rejected, with these
- * differences:
+ * segment layout): a from-scratch pure-JavaScript implementation with no native code. The parsing
+ * rules are deliberately conservative:
  *
  *  - every leading segment is walked, not just "APP0 then APP1";
- *  - a 32-bit IFD0 offset is supported instead of only the lower 16 bits;
+ *  - a 32-bit IFD0 offset is supported, not only the lower 16 bits;
  *  - writing to a file without an orientation tag raises E_INVALID_EXIF instead of silently
  *    doing nothing and returning 0;
- *  - the value to write must be an integer 1..8 (v1 wrote whatever it was given, including 0,
- *    which then acted as a read request).
+ *  - the value to write must be an integer 1..8; anything else raises E_INVALID_VALUE.
  *
- * Like v1, the writer rewrites the whole 12-byte IFD entry as SHORT/1 and never re-encodes image
- * data, so patching a file stays lossless.
+ * The writer rewrites the whole 12-byte IFD entry as SHORT/1 and never re-encodes image data, so
+ * patching a file stays lossless.
  *
  * Only finding and patching are JPEG specific (`locateOrientation`, `patchOrientation`); everything
  * below that works on any buffer that contains a TIFF block (`locateOrientationInExifBlock`,
@@ -40,9 +38,9 @@ export interface OrientationLocation {
   entryOffset: number;
   /** Absolute offset of the entry's 4-byte value field. */
   valueOffset: number;
-  /** TIFF field type of the entry as it is stored (3 = SHORT). Not validated, as in v1. */
+  /** TIFF field type of the entry as it is stored (3 = SHORT). Not validated. */
   format: number;
-  /** Number of values declared for the entry. Not validated, as in v1. */
+  /** Number of values declared for the entry. Not validated. */
   count: number;
   /** Orientation value as stored, decoded as a 16-bit number. */
   value: number;
@@ -60,7 +58,7 @@ export interface PatchResult {
   entryOffset: number;
   /** Absolute offset of the first byte that was rewritten. */
   writtenOffset: number;
-  /** Number of bytes rewritten (always 10, as in v1). */
+  /** Number of bytes rewritten (always 10). */
   writtenLength: number;
   /** Value before the patch, or `null` when it was not a valid orientation. */
   previousValue: number | null;
@@ -116,7 +114,7 @@ function writeU32(buffer: Uint8Array, offset: number, value: number, byteOrder: 
  * wider than one byte) does not raise; the location is returned with `valueValid: false` so the
  * entry can still be repaired. Reads are strict, the writer uses the lenient mode.
  * @returns the location, or `null` when the file is a readable JPEG with a readable Exif block but
- * without an orientation tag (v1 returned 0 in that case as well).
+ * without an orientation tag (reads report 0 in that case).
  * @throws OrientError E_NOT_JPEG / E_PREMATURE_END / E_INVALID_EXIF.
  */
 export function locateOrientation(
@@ -165,7 +163,7 @@ export function locateOrientationInExifBlock(
   const entriesStart = ifd0Start + 2;
   for (let index = 0; index < tagCount; index++) {
     const entryOffset = entriesStart + index * 12;
-    // v1 stops here and reports "no orientation" instead of an error.
+    // Truncated entry list: report "no orientation" instead of an error.
     if (entryOffset + 12 > end) return null;
 
     if (u16(buffer, entryOffset, byteOrder) !== TAG_ORIENTATION) continue;
@@ -195,7 +193,7 @@ export function locateOrientationInExifBlock(
   return null;
 }
 
-/** Reads the orientation, or 0 when there is no orientation tag (v1 semantics). */
+/** Reads the orientation, or 0 when there is no orientation tag. */
 export function readOrientation(buffer: Uint8Array): number {
   return locateOrientation(buffer)?.value ?? 0;
 }
@@ -214,11 +212,11 @@ function assertWritableValue(value: number): asserts value is number {
 function patchLocation(buffer: Uint8Array, location: OrientationLocation, value: number): PatchResult {
   const { byteOrder, entryOffset, value: storedValue, valueValid } = location;
   const previousValue = valueValid ? storedValue : null;
-  // v1 rewrites the whole entry as SHORT/count-1 instead of only the value bytes.
+  // Rewrite the whole entry as SHORT/count-1, not just the value bytes.
   writeU16(buffer, entryOffset + 2, 3, byteOrder); // format = unsigned short
   writeU32(buffer, entryOffset + 4, 1, byteOrder); // number of components = 1
   writeU16(buffer, entryOffset + 8, value, byteOrder); // value, stored inline
-  writeU16(buffer, entryOffset + 10, 0, byteOrder); // padding, kept at zero like v1
+  writeU16(buffer, entryOffset + 10, 0, byteOrder); // padding, kept at zero
 
   return { byteOrder, entryOffset, writtenOffset: entryOffset + 2, writtenLength: 10, previousValue, value };
 }
@@ -226,11 +224,11 @@ function patchLocation(buffer: Uint8Array, location: OrientationLocation, value:
 /**
  * Rewrites the orientation entry in place and returns what changed.
  *
- * Exactly 10 bytes are written (format, count and value of the IFD entry), matching the byte range
- * the v1 addon patched, so no image data is touched and the operation stays lossless.
+ * Exactly 10 bytes are written (format, count and value of the IFD entry), so no image data is
+ * touched and the operation stays lossless.
  *
- * A stored value that a reader would reject (0, 9, ...) does not prevent the write: v1 could repair
- * such a file and so does this implementation. `previousValue` is then `null`.
+ * A stored value that a reader would reject (0, 9, ...) does not prevent the write: such a file can
+ * still be repaired. `previousValue` is then `null`.
  */
 export function patchOrientation(buffer: Uint8Array, value: number): PatchResult {
   assertWritableValue(value);
@@ -596,7 +594,7 @@ const ORIENTATION_NAMES: Record<number, string> = {
 
 /**
  * Friendly name of an orientation value, position of the first row then the first column.
- * Returns `undefined` for unknown values, as in v1.
+ * Returns `undefined` for unknown values.
  */
 export function orientationToString(value: number): string | undefined {
   return ORIENTATION_NAMES[value];

@@ -71,28 +71,8 @@ export type { OrientationPrimitive, OrientationTransform, Rotation } from "./ori
 export { composeTransforms, isIdentity, transformFor, transformForRotation } from "./orientation.ts";
 
 import { readFile } from "node:fs/promises";
-import { cantOpenCause, OrientError } from "./errors.ts";
+import { cantOpenCause } from "./errors.ts";
 import { readOrientationFromFile, writeOrientationToFile } from "./file.ts";
-
-/** Callback shape of the v1 package, kept so that existing call sites keep working. */
-export type OrientationCallback = (error: Error | null, orientation?: number) => void;
-
-function withCallback<T>(promise: Promise<T>, callback?: (error: Error | null, value?: T) => void): Promise<T> {
-  if (callback === undefined) return promise;
-  promise.catch(() => undefined);
-  promise
-    .then(
-      (value) => callback(null, value),
-      (error: unknown) => callback(error instanceof Error ? error : new OrientError("E_INVALID_VALUE", String(error))),
-    )
-    .catch((error: unknown) => {
-      // An exception thrown by the callback itself has to surface as an uncaught exception.
-      queueMicrotask(() => {
-        throw error;
-      });
-    });
-  return promise;
-}
 
 /**
  * Reads the orientation of a JPEG or AVIF file, or sets it when a value is passed.
@@ -104,19 +84,10 @@ function withCallback<T>(promise: Promise<T>, callback?: (error: Error | null, v
  *
  * @returns the orientation value, or 0 when the file has no orientation.
  */
-export function orientation(source: string, callback?: OrientationCallback): Promise<number>;
-export function orientation(source: string, value: number, callback?: OrientationCallback): Promise<number>;
-export function orientation(
-  source: string,
-  valueOrCallback?: number | OrientationCallback,
-  maybeCallback?: OrientationCallback,
-): Promise<number> {
-  const isWrite = typeof valueOrCallback === "number";
-  const callback = typeof valueOrCallback === "function" ? valueOrCallback : maybeCallback;
-  const promise = isWrite
-    ? writeOrientationToFile(source, valueOrCallback).then((result) => result.value)
-    : readOrientationFromFile(source);
-  return withCallback(promise, callback);
+export function orientation(source: string, value?: number): Promise<number> {
+  return value === undefined
+    ? readOrientationFromFile(source)
+    : writeOrientationToFile(source, value).then((result) => result.value);
 }
 
 /** Reads a whole JPEG file; exported because every other entry point works on buffers. */

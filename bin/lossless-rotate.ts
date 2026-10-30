@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Command line front end for the package: look at a file, make a JPEG upright, crop one, write an
+ * Command line front end for the package: look at a file, rotate a JPEG losslessly, crop one, write an
  * orientation tag, or pull the embedded Exif thumbnail out.
  *
  * Nothing here is needed for the library to work; this is the quick way to see what the codec does
@@ -66,11 +66,11 @@ const manifest = readManifest();
 /** Where results land when the caller does not say where: easy to look at, easy to delete. */
 const DEFAULT_OUTPUT_DIR = "tmp";
 
-const USAGE = `lossless-rotate - make JPEGs upright without re-encoding the image data
+const USAGE = `lossless-rotate - lossless rotate & crop for JPEGs, without re-encoding the image data
 
 Usage:
   lossless-rotate info <file>                 show container, orientation, size and thumbnail
-  lossless-rotate rotate <file...>            make JPEGs upright (lossless, in the DCT domain)
+  lossless-rotate rotate <file...>            lossless rotate & crop in the DCT domain
   lossless-rotate set <file> <orientation>    write the orientation only (no re-encode)
   lossless-rotate thumbnail <file>            extract the embedded Exif thumbnail
 
@@ -87,13 +87,13 @@ Options:
   -h, --help             show this help
   -v, --version          show the package version
 
-"rotate" without an angle makes the image upright: how far to turn is read from the orientation the
+"rotate" without an angle rotates the image losslessly: how far to turn is read from the orientation the
 file already carries (90, 180 or 270 degrees, or a mirror). With --rotate <deg> the image is turned by
 a fixed amount instead, counted from the way it is displayed. There is nothing to compute by hand -
 the orientation says it, and "info" prints it.
 
 "--crop" takes the same rectangle jpegtran's -crop takes: WxH+X+Y, from the top left corner. It is
-applied after the rotation, so X and Y count from the corner of the upright image. Cropping cuts whole
+applied after the rotation, so X and Y count from the corner of the rotated image. Cropping cuts whole
 blocks, so a crop whose origin is not on the MCU grid is rounded down to it (and reported); --strict
 refuses it instead. --crop works without --rotate as well, which is a plain lossless crop.
 
@@ -253,7 +253,7 @@ function commandInfo(options: Options, files: string[]): number {
     rows.push(["orientation", info.orientation === 0 ? none : `${info.orientation} (${info.orientationName})`]);
     if (info.properties !== undefined) rows.push(["properties", info.properties.join(" ")]);
     if (info.format === "jpeg") {
-      rows.push(["transform", info.alreadyUpright ? "none (already upright)" : `${info.transform}`]);
+      rows.push(["transform", info.alreadyUpright ? "none (already correctly oriented)" : `${info.transform}`]);
       rows.push([
         "thumbnail",
         info.thumbnail === undefined
@@ -338,7 +338,7 @@ function turnedOutcome(source: Buffer, options: Options): Outcome {
 
   const outcome = transformJpeg(source, {
     primitive: combined.primitive,
-    // Nothing to clear when the file had no tag: adding an Exif block just to store "upright" would
+    // Nothing to clear when the file had no tag: adding an Exif block just to store orientation 1 would
     // grow the file for no reason.
     orientationInOutput: orientation === 0 ? undefined : 1,
     mcuAlignedOnly: options.strict,
@@ -375,7 +375,7 @@ function commandRotate(options: Options, files: string[]): number {
     const destination =
       outcome.copied && options.output === undefined ? null : outputPath(options.output, file, ".upright");
     if (destination === null) {
-      const state = options.rotation === undefined ? "already upright" : "already in that orientation";
+      const state = options.rotation === undefined ? "already correctly oriented" : "already in that orientation";
       report(options, `${file}: ${state}, nothing written`);
     } else {
       writeFileSync(destination, outcome.bytes);

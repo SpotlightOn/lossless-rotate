@@ -1,5 +1,5 @@
 /**
- * Tests for the pure-JavaScript EXIF layer that replaces the v1 C addon.
+ * Tests for the pure-JavaScript EXIF layer.
  *
  * The fixture manifest is the oracle: it records where the orientation entry sits in each file and
  * which value the file was built with, so the "did the writer touch anything else?" question can be
@@ -126,7 +126,7 @@ test("patching rewrites exactly the 10 bytes of the IFD entry and nothing else",
   }
 });
 
-test("patching is idempotent and keeps v1's entry format rewrite", () => {
+test("patching is idempotent and keeps the entry format stable", () => {
   const original = bytesOf("exif-mm-06-tag.jpg");
   const once = Buffer.from(original);
   patchOrientation(once, 3);
@@ -134,7 +134,7 @@ test("patching is idempotent and keeps v1's entry format rewrite", () => {
   patchOrientation(twice, 3);
   assert.deepEqual(differingOffsets(once, twice), [], "second write with the same value must not change bytes");
 
-  // v1 rewrote format = SHORT and count = 1 by hand; keep that so byte diffs stay identical.
+  // The writer sets format = SHORT and count = 1 by hand; keep that so byte diffs stay identical.
   const location = locateOrientation(once);
   assert.equal(location?.format, 3);
   assert.equal(location?.count, 1);
@@ -243,7 +243,7 @@ test("buildExifApp1 output is self-describing", () => {
   assert.equal(segment.subarray(4, 10).toString("latin1"), "Exif\0\0");
 });
 
-test("orientationToString matches the v1 names", () => {
+test("orientationToString returns the eight documented names", () => {
   const expected = [
     "TopLeft",
     "TopRight",
@@ -257,12 +257,12 @@ test("orientationToString matches the v1 names", () => {
   for (let value = 1; value <= 8; value++) {
     assert.equal(orientationToString(value), expected[value - 1]);
   }
-  // v1 returned undefined for unknown values.
+  // Unknown values have no name.
   assert.equal(orientationToString(0), undefined);
   assert.equal(orientationToString(9), undefined);
 });
 
-test("jpegSegments walks layouts that the v1 addon rejected", () => {
+test("jpegSegments walks every leading segment layout", () => {
   // Layouts covered by the corpus: APP1 first, APP0+APP2+APP1, XMP APP1 before the Exif APP1.
   for (const file of ["exif-first.jpg", "app0-app2-exif.jpg", "xmp-then-exif.jpg"]) {
     assert.equal(readOrientation(bytesOf(file)), 6, file);

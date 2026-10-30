@@ -1,13 +1,9 @@
 # Design of `@chimok/lossless-rotate`
 
-`lossless-rotate` makes JPEG images upright without re-encoding them. It reads and writes the Exif
+`lossless-rotate` rotates and crops JPEG images losslessly without re-encoding them. It reads and writes the Exif
 orientation tag and rotates the image by rearranging quantized DCT coefficients — no IDCT, no
 requantization, no native code. This document explains how it works and how the claims about it were
 verified.
-
-It replaces `jpegorientation` v1, a small package whose rotation shelled out to GraphicsMagick (and
-therefore re-encoded the image) and whose orientation helper was a native addon. The package here is a
-from-scratch pure JavaScript/TypeScript implementation with no runtime dependencies.
 
 ---
 
@@ -43,8 +39,8 @@ JPEG file stores. Those are integers, and the transforms are exact integer opera
 
 Decoding the entropy-coded bit stream and re-encoding it is the only real work, and both are a few
 hundred lines of well-specified bit manipulation (T.81 Annex B/C/F). That is the whole reason this
-package exists without any native dependency. A re-encode through a pixel codec (as v1 did via
-GraphicsMagick) is *not* lossless, which is what this package fixes.
+package exists without any native dependency. A re-encode through a pixel codec is *not* lossless;
+rearranging the coefficients is.
 
 The alternative of delegating to a WASM `jpegtran` was researched and rejected (see §7).
 
@@ -82,8 +78,8 @@ buffers.
 
 ### Public API
 
-* `orientation(source, [value], [callback])` — read, or set (metadata only), v1-compatible.
-* `autoRotate(source, [destination], [options])`, `autoRotateBuffer(bytes, [options])` — make upright,
+* `orientation(source, [value])` — read, or set (metadata only).
+* `autoRotate(source, [destination], [options])`, `autoRotateBuffer(bytes, [options])` — rotate losslessly,
   optionally cropping in the same pass (`options.crop`).
 * `crop(source, region, [destination], [options])`, `cropBuffer(bytes, region, [options])` — cut a
   rectangle of whole blocks out of a JPEG, optionally after a rotation.
@@ -201,8 +197,8 @@ written out sequential and reported with a warning; progressive *output* is out 
 Metadata: the source's APPn/COM segments are carried over (droppable with `keepMetadata: false`), and
 if there is an Exif APP1 segment its orientation tag is set to `orientationInOutput` (default 1).
 
-**Already upright.** Orientation `0` (no tag) or `1` is a byte-exact copy — never re-encoded. This is
-a deliberate difference from v1, which re-encoded everything through GraphicsMagick.
+**Already correctly oriented.** Orientation `0` (no tag) or `1` is a byte-exact copy — never re-encoded. This is
+re-encoding it would only lose quality.
 
 ### Cropping
 
@@ -314,7 +310,7 @@ running the real executable: it asserts that the default output lands in `tmp/` 
 is byte-for-byte unchanged.
 
 The one design decision the CLI needed from the library is `--rotate <deg>`. "Rotate by N degrees" is
-not what `rotate` does — it makes the image upright from the tag — so the explicit angle is *counted
+not what `rotate` does — it rotates the image according to the tag — so the explicit angle is *counted
 from the way the image is displayed*: the stored tag is applied first and cleared afterwards. That
 makes two transforms in a row, which is why `composeTransforms` exists: the composed result is one
 primitive, so the CLI performs a single lossless pass (rotating twice would move the partial edge
@@ -338,32 +334,7 @@ image size, sampling factor and transform (0 mismatches).
 
 ---
 
-## 9. Behaviour changes relative to v1
-
-| case | v1 | lossless-rotate |
-| --- | --- | --- |
-| JPEG without any Exif block, read | error −3 | `0` (no orientation) |
-| leading non-Exif APP1 (XMP), read | error −3 | skipped, scanning continues |
-| APP0 + APP2 (ICC) + APP1 | error −3 | works |
-| IFD0 offset above 65535 | impossible | supported (32-bit) |
-| truncated segment while reading | error −3 | `E_PREMATURE_END` |
-| set on a file without an orientation tag | silent no-op, returned 0 | `E_INVALID_EXIF`, or `insertOrientation()` |
-| set with `0` | acted as a read request | `E_INVALID_VALUE` |
-| set with a value > 8 | wrote it anyway | `E_INVALID_VALUE` |
-| write byte range | 10 bytes at `entry+2` | identical |
-| rotation | GraphicsMagick re-encode (lossy) | lossless DCT transform |
-| crop | not available | lossless block selection (`crop`, `--crop`), coefficient-identical to `jpegtran -crop` |
-| already upright image | re-encoded | byte-exact copy |
-| error surface | numeric `legacyCode` | string `code` |
-| WebP orientation, read/write | not supported | deliberately not supported (§11): browsers ignore the Exif tag in WebP |
-| WebP rotation (`autoRotate`) | re-encoded via GraphicsMagick | `E_UNSUPPORTED_FORMAT`, a WebP is not a file this package handles |
-| AVIF orientation, read/write | not supported | works: the `irot`/`imir` property, `meta`/`iloc` rebuilt |
-| AVIF rotation (`autoRotate`) | not supported | `E_UNSUPPORTED`, the property is the answer |
-| non-JPEG/AVIF file, file API | error −3 | `E_UNSUPPORTED_FORMAT` |
-
----
-
-## 10. Out of scope, and roadmap
+## 9. Out of scope, and roadmap
 
 Out of scope: non-JPEG formats, lossless *scale*, thumbnail regeneration, progressive
 **output**, arithmetic coding, 12-bit samples, and multi-image (MPO) files.
@@ -373,20 +344,20 @@ Lossless **crop** is in scope and implemented as a block-grid selection in §6 (
 is a different algorithm, not a subset of the transform. The rest of the list stands for the same reason
 as before: the package rearranges whole coefficients, it does not re-encode pixels.
 
-The embedded Exif thumbnail is rotated together with the main image (§12); that is not "thumbnail
+The embedded Exif thumbnail is rotated together with the main image (§11); that is not "thumbnail
 regeneration" — the thumbnail stays the same JPEG, only rotated losslessly.
 
-The AVIF container layer (§13) reads and writes the `irot`/`imir` properties of the primary item, with
+The AVIF container layer (§12) reads and writes the `irot`/`imir` properties of the primary item, with
 the property set and the `iloc` extents rebuilt around them. Metadata only, for the same reason — AV1
 has no coefficient-domain rotation — and byte-identical to `avifenc --irot/--imir`.
 
-WebP is deliberately not supported; §11 explains why.
+WebP is deliberately not supported; §10 explains why.
 
 Planned next:
 
 1. **AVIF Exif item** — an AVIF may also carry the orientation in an embedded Exif item. libavif treats
    `irot`/`imir` as the source of truth and normalises that tag to 1 (`avifImageExtractExifOrientationToIrotImir`),
-   so the property path (§13) already covers the files in the wild; reading the Exif item as a fallback
+   so the property path (§12) already covers the files in the wild; reading the Exif item as a fallback
    is a refinement, not a gap that changes behaviour.
 2. **Lossless *pixel* rotation for AVIF**, built on the same decode → transform → encode
    skeleton. The codec front end is format specific, the transform layer is not: an AVIF is an AV1 still
@@ -398,11 +369,11 @@ The goal is one transform core with pluggable per-format parse/decode/encode bac
 
 ---
 
-## 11. Why WebP is not supported
+## 10. Why WebP is not supported
 
 A WebP can legally carry an Exif orientation tag in its RIFF `EXIF` chunk, and reading and patching it
 would be straightforward — but no browser honours it. Chromium and Firefox render a tagged WebP as if
-the tag were absent, so a package whose promise is "makes images upright" would be writing a value
+the tag were absent, so a package whose promise is "rotate losslessly" would be writing a value
 nothing reads back. WebP is therefore treated like any other unsupported format: `E_UNSUPPORTED_FORMAT`
 at the file level, and `autoRotateBuffer` refuses it.
 
@@ -412,7 +383,7 @@ AVIF is the opposite case, which is why it *is* supported: `irot`/`imir` is defi
 
 ---
 
-## 12. The embedded Exif thumbnail
+## 11. The embedded Exif thumbnail
 
 An Exif block usually describes its main image in IFD0 and a small preview in IFD1: tags `0x0201`
 (offset of the thumbnail JPEG, relative to the TIFF header) and `0x0202` (its length, a `SHORT` or a
@@ -472,7 +443,7 @@ grew by exactly the difference in thumbnail length — i.e. that nothing else in
 
 ---
 
-## 13. AVIF: the metadata layer
+## 12. AVIF: the metadata layer
 
 An AVIF file is an ISOBMFF box tree: an `ftyp` box naming an AVIF brand, a `meta` full box, and the
 compressed image data in `mdat`. The interesting part is the item structure inside `meta` (ISO/IEC
