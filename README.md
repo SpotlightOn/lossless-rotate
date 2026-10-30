@@ -5,7 +5,7 @@
 [![Node](https://img.shields.io/badge/node-%E2%89%A524-brightgreen)](https://nodejs.org)
 [![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
-Make JPEGs upright — in the DCT domain, so **not a single pixel is re-encoded**.
+Make JPEGs upright or cut a rectangle out of them — in the DCT domain, so **not a single pixel is re-encoded**.
 
 This is a pure TypeScript version of `jpegtran`. There is also a WASM version, which is better tested:
 [`@chimok/jpegtran-js`](https://www.npmjs.com/package/@chimok/jpegtran-js).
@@ -15,9 +15,9 @@ The AVIF `irot`/`imir` properties are defined by the HEIF standard,
 [AVIF specification](https://aomediacodec.github.io/av1-avif/) (§9.1.2). Not every browser applies them
 yet, but they are the lossless way to orient an AVIF, so they are supported here for the future.
 
-`lossless-rotate` reads and writes the Exif orientation tag and rotates JPEG images by
-90°/180°/270° and the diagonal mirrors **losslessly**: the quantized DCT coefficients are rearranged,
-never dequantized and never requantized. No quality loss, no generation loss, no native code.
+`lossless-rotate` reads and writes the Exif orientation tag, rotates JPEG images by 90°/180°/270° and
+the diagonal mirrors, and crops them **losslessly**: the quantized DCT coefficients are rearranged or
+selected, never dequantized and never requantized. No quality loss, no generation loss, no native code.
 
 The same reasoning covers **AVIF**: it stores its orientation not in a tag but in the `irot`/`imir`
 properties of its primary item. AV1 has no lossless rotation, so `orientation()` reads and writes those
@@ -29,6 +29,8 @@ properties (rebuilding the property set and repairing the `iloc` extents, image 
 - **Lossless by construction.** The transform operates on the entropy-coded coefficients; decoding a
   transformed file and decoding a rotated copy of the original agree exactly (verified against
   `jpegtran`).
+- **Lossless crop** (`crop` / `cropBuffer`): whole coefficient blocks, optionally in the same pass as a
+  rotation.
 - **Baseline and progressive input.** Progressive files are decoded across all scans and written out
   as a sequential JPEG — still coefficient-exact.
 - **AVIF orientation** is written as the `irot`/`imir` item properties; the property set is rebuilt and
@@ -97,6 +99,22 @@ const tagged = setOrientation(source, 6);   // insert/patch the tag, no rotation
 canTransform(source);                        // false instead of throwing for non-JPEGs
 ```
 
+### Crop a JPEG
+
+The DCT blocks of the region are copied as they are, so the remaining pixels are the originals. The
+origin has to sit on the MCU grid (16×16 for 4:2:0); otherwise it is rounded down like `jpegtran` and
+`warnings` says so (`onUnaligned: "error"` refuses).
+
+```js
+import { crop, cropBuffer } from "@chimok/lossless-rotate";
+
+await crop("IMG_0001.jpg", { x: 160, y: 120, width: 640, height: 480 }, "crop.jpg");
+const { bytes } = cropBuffer(source, { x: 0, y: 0, width: 800, height: 600 });
+
+// Same pass as a rotation; the rectangle counts in the upright image.
+await autoRotate("IMG_0001.jpg", "out.jpg", { crop: { x: 0, y: 0, width: 1200, height: 900 } });
+```
+
 ### AVIF
 
 An AVIF still image is one ISOBMFF *item*. Its orientation is not a tag in a metadata block but the
@@ -145,8 +163,12 @@ await autoRotate(source, destination, {
   orientationInOutput: 1, // value written to the result, default 1 (upright)
   keepMetadata: true,     // carry APPn/COM segments over, default true
   rotateThumbnail: false, // rotate the embedded Exif thumbnail too, default false
+  crop: { x: 0, y: 0, width: 1200, height: 900 }, // optional, counted after the rotation
 });
 ```
+
+`crop(source, region, [destination], [options])` takes `onUnaligned`, `keepMetadata` and
+`orientationInOutput` (default `undefined`: a crop leaves the tag alone).
 
 ### The embedded Exif thumbnail
 
@@ -186,6 +208,7 @@ The package ships a small CLI for looking at and fixing files without writing an
 npx lossless-rotate info photo.jpg                 # container, orientation, size, thumbnail
 npx lossless-rotate rotate photo.jpg --thumbnail   # make upright, thumbnail included
 npx lossless-rotate rotate photo.jpg --rotate 90   # turn it 90 degrees clockwise
+npx lossless-rotate rotate photo.jpg --crop 640x480+160+120  # keep that rectangle (after the turn)
 npx lossless-rotate rotate *.jpg -o upright/       # several files into a directory
 npx lossless-rotate set photo.jpg 6                # write the orientation only, no re-encode
 npx lossless-rotate set photo.avif 6               # ... also for AVIF
@@ -195,7 +218,7 @@ npx lossless-rotate thumbnail photo.jpg            # extract the embedded Exif t
 | Command | What it does |
 | --- | --- |
 | `info <file>` | Prints the format, orientation, size, sampling, the transform that would be applied, and (for JPEG) whether an Exif thumbnail is embedded and can be rotated. `--json` prints the same as JSON. |
-| `rotate <file...>` | Makes JPEGs upright (lossless). `--thumbnail` rotates the embedded thumbnail too, `--strict` refuses imperfect transforms, `--drop-metadata` drops APPn/COM. Refuses AVIF (`E_UNSUPPORTED`). |
+| `rotate <file...>` | Makes JPEGs upright (lossless). `--thumbnail` rotates the embedded thumbnail too, `--crop WxH+X+Y` keeps only that rectangle, `--strict` refuses imperfect transforms and unaligned crops, `--drop-metadata` drops APPn/COM. Refuses AVIF (`E_UNSUPPORTED`). |
 | `set <file> <orientation>` | Writes the orientation only — the Exif tag for JPEG, the `irot`/`imir` property for AVIF; the image data is copied untouched (a minimal Exif block is added when there is none). |
 | `thumbnail <file>` | Extracts the embedded Exif thumbnail as a JPEG. Exits `1` when there is none. |
 
@@ -221,6 +244,9 @@ A tag of 6 already means "turn 90 clockwise", so `--rotate 90` on such a file be
 one pass — one lossless transform, not two, so the partial edge blocks only move once. If the tag and
 the requested angle cancel out (tag 3 with `--rotate 180`), the file is copied instead of re-encoded.
 A file with no tag at all gets its pixels turned and no tag invented for it.
+
+`--crop WxH+X+Y` is applied after `--rotate` and counts from the displayed image; without `--rotate` it
+is a plain crop.
 
 Results are written into `tmp/` (git-ignored, safe to delete) unless `-o/--output` says otherwise, so
 trying something out never modifies the input and never leaves anything behind that would show up in
@@ -258,17 +284,21 @@ For a **perfect** transform the decoded result is byte-identical to `jpegtran`'s
 test suite asserts this across image sizes, sampling factors (4:2:0, 4:2:2, 4:4:4), and all seven
 transforms.
 
+A crop has the mirrored constraint — its **origin** has to be on the MCU grid, not its size — see
+[Crop a JPEG](#crop-a-jpeg).
+
 ## What the package does with a file
 
 - **Exif is preserved.** APPn and COM segments are carried over unchanged; the orientation tag in the
   result is set to 1 (configurable). `keepMetadata: false` drops them.
 - **The embedded Exif thumbnail is carried over unchanged** unless `rotateThumbnail: true` asks for it
-  to be rotated with the same primitive.
+  to be rotated with the same primitive. A crop does **not** touch the thumbnail — it cannot be scaled
+  down losslessly — and a warning says that the thumbnail still shows the uncropped image.
 - **Progressive in, sequential out.** Progressive input is decoded scan by scan and re-encoded as a
   baseline JPEG, with the source's quantization tables. A warning says so. Progressive output is out
   of scope.
 - **Restart markers are dropped** (always legal); a warning says so.
-- **An already upright image is copied byte-for-byte**, never re-encoded.
+- **An already upright image is copied byte-for-byte**, never re-encoded; so is a crop of the whole image.
 - **Images without Exif are not touched** by `autoRotateBuffer`; it reports orientation `0` and copies.
 
 ## Errors
@@ -284,8 +314,8 @@ Every failure is an `OrientError` with a stable `code`:
 | `E_INVALID_EXIF` | The Exif block is structurally broken, has no orientation tag to update, or (with `rotateThumbnail`) cannot be fixed up safely. |
 | `E_INVALID_JPEG` | The JPEG structure is broken (markers, tables, entropy data). |
 | `E_INVALID_AVIF` | The AVIF ISOBMFF structure is broken (a box runs past the end of the file, or `meta`/`iprp`/`ipco`/`ipma` is missing). |
-| `E_INVALID_VALUE` | An argument was out of range (e.g. an orientation outside 1..8). |
-| `E_UNSUPPORTED` | A feature this package cannot transform losslessly (e.g. arithmetic coding, `onImperfect: "error"`, rotating an AVIF, or `rotateThumbnail` on a thumbnail it cannot transform). |
+| `E_INVALID_VALUE` | An argument was out of range (e.g. an orientation outside 1..8, or a crop region that is empty, fractional, negative or outside the image). |
+| `E_UNSUPPORTED` | A feature this package cannot transform losslessly (e.g. arithmetic coding, `onImperfect: "error"`, `onUnaligned: "error"`, rotating or cropping an AVIF, or `rotateThumbnail` on a thumbnail it cannot transform). |
 
 ## Lower-level API
 
@@ -295,9 +325,12 @@ The transformer and the parsing layers are exported for callers that want to bui
 import { transformJpeg, parseJpeg, decodeCoefficients, frameGeometry, isPerfectTransform } from "@chimok/lossless-rotate";
 ```
 
-`transformJpeg(bytes, { primitive })` applies one primitive (`flipHorizontal`, `flipVertical`,
-`rotate180`, `rotate90`, `rotate270`, `transpose`, `transverse`, or `none`). `decodeCoefficients` and
-`parseJpeg` expose the decoded blocks and the parsed structure.
+`transformJpeg(bytes, { primitive, crop })` applies one primitive (`flipHorizontal`, `flipVertical`,
+`rotate180`, `rotate90`, `rotate270`, `transpose`, `transverse`, or `none`) and, optionally, crops the
+result in the same pass. `decodeCoefficients` and `parseJpeg` expose the decoded blocks and the parsed
+structure. For a crop alone there is `cropGeometry(frameGeometry(frame), region)`, which returns the
+block arithmetic and the region that the MCU grid allows, plus `cropRegionToString` for the `WxH+X+Y`
+notation.
 
 The TIFF/Exif code sits one level below the container, so the tag can also be handled on a bare TIFF
 block. The `...InExifBlock` variants take that block with its bounds instead of an APP1 segment:
@@ -349,7 +382,7 @@ See `DESIGN.md` for the full behaviour table and the verification evidence.
 
 ```sh
 pnpm build          # tsc -p tsconfig.build.json -> dist/
-pnpm test           # node --test  (118 tests)
+pnpm test           # node --test  (133 tests)
 pnpm run typecheck  # tsc --noEmit
 pnpm run lint       # biome check .
 pnpm run lint:fix   # biome check --write .   (formats and sorts imports)
@@ -401,9 +434,10 @@ repository owner's scope instead, so there is no single name that could be publi
 
 ## Roadmap
 
-0.6.0 is the current early version: JPEG rotation with the Exif thumbnail, plus AVIF orientation as the
-primary item's `irot`/`imir` properties. WebP is deliberately out of scope — browsers ignore its Exif
-orientation tag (see [DESIGN.md §11](DESIGN.md#11-why-webp-is-not-supported)). Still open:
+0.6.0 is the released version: JPEG rotation with the Exif thumbnail, plus AVIF orientation as the
+primary item's `irot`/`imir` properties. The next version adds lossless crop (see
+[Crop a JPEG](#crop-a-jpeg)). WebP is deliberately out of scope — browsers ignore its Exif orientation
+tag (see [DESIGN.md §11](DESIGN.md#11-why-webp-is-not-supported)). Still open:
 
 1. **AVIF Exif item**: an AVIF can also carry its orientation in an embedded Exif item. libavif treats
    `irot`/`imir` as the source of truth and normalises that tag to 1, so the property path already

@@ -53,8 +53,9 @@ The alternative of delegating to a WASM `jpegtran` was researched and rejected (
 ## 3. Architecture
 
 ```
-src/index.ts             public API: orientation(), autoRotate(), ... and the re-exports
+src/index.ts             public API: orientation(), autoRotate(), crop(), ... and the re-exports
 src/autoRotate.ts        high level orchestration: orientation -> transform -> codec -> write
+src/crop.ts              high level crop: rectangle -> codec -> write
 src/orientation.ts       the orientation(1..8) -> transform table, as pure data
 src/exif.ts              locate / read / patch / insert the Exif orientation entry (TIFF level),
                          plus the embedded thumbnail layer (locate/replace, offset fixup)
@@ -67,11 +68,11 @@ src/avif/orientation.ts  the irot/imir properties of the primary item
 src/jpeg/parse.ts        JPEG structure: SOF/DHT/DQT/DRI/SOS and per-scan table snapshots
 src/jpeg/huffman.ts      canonical Huffman decoding/encoding and the entropy bit streams
 src/jpeg/decoder.ts      baseline and progressive entropy decoding -> coefficient grids
-src/jpeg/geometry.ts     component block grids, MCU layout, "perfect transform" predicate
-src/jpeg/transform.ts    the seven coefficient-domain primitives
-src/jpeg/encoder.ts      baseline sequential entropy encoding
+src/jpeg/geometry.ts     component block grids, MCU layout, "perfect transform" predicate, crop arithmetic
+src/jpeg/transform.ts    the seven coefficient-domain primitives, plus selecting a block sub-grid
+src/jpeg/encoder.ts      baseline sequential entropy encoding, blanking the padding of an edge iMCU
 src/jpeg/tables.ts       standard Annex K Huffman tables and the zig-zag order
-src/jpeg/codec.ts        parse -> decode -> transform -> encode, plus metadata handling
+src/jpeg/codec.ts        parse -> decode -> transform -> crop -> encode, plus metadata handling
 ```
 
 Everything below `src/` is pure and synchronous; `src/file.ts`, `src/autoRotate.ts` and
@@ -82,7 +83,10 @@ buffers.
 ### Public API
 
 * `orientation(source, [value], [callback])` — read, or set (metadata only), v1-compatible.
-* `autoRotate(source, [destination], [options])`, `autoRotateBuffer(bytes, [options])` — make upright.
+* `autoRotate(source, [destination], [options])`, `autoRotateBuffer(bytes, [options])` — make upright,
+  optionally cropping in the same pass (`options.crop`).
+* `crop(source, region, [destination], [options])`, `cropBuffer(bytes, region, [options])` — cut a
+  rectangle of whole blocks out of a JPEG, optionally after a rotation.
 * `setOrientation`, `canTransform`, `readOrientation`, `patchOrientation`, `insertOrientation`,
   `buildExifApp1`, `orientationToString`.
 * `readOrientationInExifBlock`, `patchOrientationInExifBlock`, `buildExifTiff` — the TIFF level, shared
@@ -94,8 +98,8 @@ buffers.
 * `isAvif`, `avifLayout`, `avifImageSize`, `avifPropertyTypes`, `readAvifOrientation`,
   `writeAvifOrientation`, `setAvifOrientation` — the AVIF metadata layer (also reachable as
   `@chimok/lossless-rotate/avif`).
-* `transformJpeg`, `parseJpeg`, `decodeCoefficients`, `frameGeometry`, `isPerfectTransform` — the
-  layers below.
+* `transformJpeg`, `parseJpeg`, `decodeCoefficients`, `frameGeometry`, `isPerfectTransform`,
+  `cropGeometry`, `cropRegionToString` — the layers below (`transformJpeg` takes `crop` as well).
 
 ---
 
@@ -164,6 +168,9 @@ and reports it in `result.warnings` (`onImperfect: "warn"`, the default); `onImp
 refuses with `E_UNSUPPORTED` instead. The warning is part of the return value, never a console
 message, because a caller has to be able to react to it.
 
+A **crop** has the mirrored condition — its origin, not its dimensions, has to line up with the grid;
+§6 ("Cropping") describes it.
+
 ---
 
 ## 6. The codec
@@ -197,6 +204,33 @@ if there is an Exif APP1 segment its orientation tag is set to `orientationInOut
 **Already upright.** Orientation `0` (no tag) or `1` is a byte-exact copy — never re-encoded. This is
 a deliberate difference from v1, which re-encoded everything through GraphicsMagick.
 
+### Cropping
+
+A crop needs no new decode/encode path: the block grid of the region is copied as it is
+(`cropPlane`), every coefficient keeps its value, and the header takes the region's dimensions
+(`cropGeometry`). It is exact by construction; only the alignment can differ from what was asked for.
+
+The rule mirrors §5: a crop needs its **origin** on the MCU grid, not its dimensions, because a block
+cannot be cut in half — a far edge inside an MCU only leaves padding that holds no visible pixel.
+
+| asked for (4:2:0, MCU 16×16) | produced | why |
+| --- | --- | --- |
+| `20x20+0+0` | `20x20+0+0` | origin aligned; the edge iMCU is padding |
+| `20x20+5+3` | `25x23+0+0` | origin floors to the grid; the far edge stays at 25×23 |
+
+The origin rounds **down** like `jpegtran`; the applied region is returned and a warning says what it is,
+`onUnaligned: "error"` refuses instead. An empty, fractional, negative or out-of-image region raises
+`E_INVALID_VALUE` (no clamping). The region counts in the image **after** the transform, like
+`jpegtran -crop`, and transform + crop are one pass. A whole-image crop is a byte-exact copy.
+
+**Padding blocks are blanked.** Blocks of a partial edge iMCU that lie outside the visible result are
+encoded with DC difference 0 and no AC coefficients, as libjpeg-turbo does — which keeps the cut-away
+pixels out of the file and makes the result coefficient-identical to `jpegtran -crop`. A transform keeps
+the source's padding instead.
+
+A crop does not touch the embedded thumbnail (it cannot be scaled down losslessly) and says so in a
+warning; an AVIF is refused with `E_UNSUPPORTED`, because cropping AV1 means re-encoding.
+
 ---
 
 ## 7. Why not a WASM/binary codec
@@ -220,7 +254,7 @@ native binary"; the decision was the own implementation.
 
 ## 8. Verification
 
-The claim "lossless" is only meaningful with evidence. Seven independent layers of it:
+The claim "lossless" is only meaningful with evidence. Eight independent layers of it:
 
 The suites are grouped by format: `test/core/` holds the format-agnostic parts (the orientation table
 and the public API contract) plus the shared fixture and CLI helpers, `test/jpeg/` and `test/avif/` hold
@@ -245,13 +279,22 @@ the format-specific suites, and `test/fixtures/` is the shared corpus that both 
    * **a progressive file decodes to the same coefficients as `jpegtran`'s sequential transcode**,
      which pins the progressive decoder exactly (and would have caught the table-redefinition bug).
 
-4. **The fixture corpus is verified** (`scripts/make-fixtures.mjs` + `manifest.json`). The generator
+4. **Crops are verified twice over** (`test/jpeg/crop.test.ts` plus the differential suite). The unit
+   test restates the block arithmetic literally (pixel offset → block offset per component), so a
+   mistake in `cropGeometry` shows up as a coefficient difference instead of agreement with itself; it
+   also pins the padding blanking, the rounding and its warning, the refusal of impossible regions and
+   the whole-image copy. The differential test then checks that a crop is **coefficient-identical to
+   `jpegtran -crop`** (colour, grayscale, progressive, and a source that is not MCU aligned itself) and
+   that `djpeg -nosmooth` decodes it to the **literal pixel rectangle** of the source; rotate + crop in
+   one pass is compared with `jpegtran -rotate -crop`.
+
+5. **The fixture corpus is verified** (`scripts/make-fixtures.mjs` + `manifest.json`). The generator
    checks each base image's real frame (dimensions, sampling factors, progressive flag) and records it;
    the orientation fixtures are written from explicit byte arrays, so the tests never compare the
    implementation with itself. `test/jpeg/exif.test.ts` and `test/jpeg/file.test.ts` assert, among other things,
    that patching rewrites *exactly* the ten bytes of the IFD entry and nothing else.
 
-5. **AVIF metadata is verified three ways** (`test/avif/orientation.test.ts`). The hand-built fixtures
+6. **AVIF metadata is verified three ways** (`test/avif/orientation.test.ts`). The hand-built fixtures
    describe the property list, the primary item and the `iloc` extent, and a file the writer produces
    has to equal the hand-built one byte for byte for all eight orientations. On top of that, `avifenc`
    is driven as an independent writer (`--irot`/`--imir`): the reader must read back what libavif wrote,
@@ -259,7 +302,7 @@ the format-specific suites, and `test/fixtures/` is the shared corpus that both 
    file to the literal pixel rotation of the original (checked against ImageMagick's `-rotate`). The
    external tests skip themselves when the tool is missing, like the JPEG differential tests.
 
-6. **The thumbnail fixup is verified against an independent reader** (`test/jpeg/thumbnail.test.ts`). The
+7. **The thumbnail fixup is verified against an independent reader** (`test/jpeg/thumbnail.test.ts`). The
    test carries its own TIFF/IFD walker (it follows the offsets itself to resolve `Make`, the thumbnail
    bounds and the orientation), so the offset fixup is never compared with the code that performs it.
    The corpus covers the layout combinations that matter, and the tests assert the two invariants that
@@ -287,6 +330,8 @@ compared against a literal pixel rotation of a `djpeg` decode of the same file):
 | 4:2:2 does not block 90° rotation | `-rotate 90` swaps 2×1 sampling to 1×2 and stays coefficient-exact |
 | the real constraint is MCU alignment | with `-perfect`, `jpegtran` fails for 41×27, 17×9, 8×8 (4:2:0) and 3×2, but succeeds for 64×48 in 4:2:0/4:2:2/4:4:4 |
 | images smaller than one MCU are degenerate | 3×2 4:2:0 `-rotate 180` decodes identically to the input |
+| a crop is exact, not approximate | `-crop 20x20+5+3` on 64×48 gives `25x23+0+0`; our blocks equal `jpegtran`'s, and `djpeg -nosmooth` decodes the literal source rectangle (0 differing bytes) |
+| libjpeg-turbo blanks the edge iMCU of a cropped result | DC difference 0, no AC coefficients; reproduced block for block |
 
 The perfect-transform predicate was additionally verified against `jpegtran` for 392 combinations of
 image size, sampling factor and transform (0 mismatches).
@@ -307,6 +352,7 @@ image size, sampling factor and transform (0 mismatches).
 | set with a value > 8 | wrote it anyway | `E_INVALID_VALUE` |
 | write byte range | 10 bytes at `entry+2` | identical |
 | rotation | GraphicsMagick re-encode (lossy) | lossless DCT transform |
+| crop | not available | lossless block selection (`crop`, `--crop`), coefficient-identical to `jpegtran -crop` |
 | already upright image | re-encoded | byte-exact copy |
 | error surface | numeric `legacyCode` | string `code` |
 | WebP orientation, read/write | not supported | deliberately not supported (§11): browsers ignore the Exif tag in WebP |
@@ -319,8 +365,13 @@ image size, sampling factor and transform (0 mismatches).
 
 ## 10. Out of scope, and roadmap
 
-Out of scope for 0.6.0: non-JPEG formats, lossless crop/scale, thumbnail regeneration, progressive
+Out of scope: non-JPEG formats, lossless *scale*, thumbnail regeneration, progressive
 **output**, arithmetic coding, 12-bit samples, and multi-image (MPO) files.
+
+Lossless **crop** is in scope and implemented as a block-grid selection in §6 ("Cropping"). Lossless
+*scale* is not: resampling a JPEG without generation loss would need coefficient-domain filtering, which
+is a different algorithm, not a subset of the transform. The rest of the list stands for the same reason
+as before: the package rearranges whole coefficients, it does not re-encode pixels.
 
 The embedded Exif thumbnail is rotated together with the main image (§12); that is not "thumbnail
 regeneration" — the thumbnail stays the same JPEG, only rotated losslessly.
@@ -405,6 +456,11 @@ transform (arithmetic coding, 12-bit, two components) is re-raised as `E_UNSUPPO
 thumbnail is not a usable JPEG. Warnings from the inner transform are prefixed
 `the embedded Exif thumbnail: `, so a "progressive input" or "not MCU aligned" note is never mistaken
 for one about the main image. `thumbnailRotated` reports whether anything happened.
+
+A **crop** never touches the thumbnail: cropping it would mean downscaling it, and a scale is the one
+thing this package does not do losslessly. The block is therefore carried over unchanged and a warning
+says that the thumbnail still shows the uncropped image. (Rotating the thumbnail *and* cropping the main
+image is fine - the thumbnail is rotated, then left at its own size.)
 
 Verification: `test/jpeg/thumbnail.test.ts` reads the fixtures with its **own** TIFF/IFD walker (it follows
 the offsets itself and resolves `Make` through them), so the fixup is never checked against the code

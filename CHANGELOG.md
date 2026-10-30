@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file. The format foll
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Lossless JPEG crop.** `crop` / `cropBuffer` and `--crop WxH+X+Y` cut a rectangle of whole DCT blocks
+  out of an image without changing a coefficient, optionally in the same pass as a rotation. An origin
+  off the MCU grid is rounded down like `jpegtran` and reported (`onUnaligned: "error"` refuses).
+- `transformJpeg({ crop })`, `cropGeometry`, `cropRegionToString` and `crop` on `autoRotate`'s options,
+  plus unit and differential tests against `jpegtran -crop`.
+
 ## [0.6.0] - 2026-10-21
 
 Early stage, nothing released yet. Successor to `jpegorientation` v1: same task, no native code, no
