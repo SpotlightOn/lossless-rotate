@@ -1,5 +1,5 @@
 /**
- * File-level operations: the modern replacement for the v1 addon's `fopen`/`fread`/`fwrite` pair.
+ * File-level operations: the same read/write surface as the buffer API, but on a path.
  *
  * The container is detected from the first bytes, so the same functions serve JPEG and AVIF.
  *
@@ -67,8 +67,8 @@ async function withHandle<T>(path: string, flags: string, run: (handle: FileHand
     if (!(await handle.stat()).isFile()) throw cantOpenCause(new Error(`${path} is not a regular file`));
     return await run(handle);
   } catch (error) {
-    // A read/write failure on an open file keeps the v1 "E_CANT_OPEN" meaning for its -1 result,
-    // but never masks an error this package raised itself.
+    // A read/write failure on an open file is E_CANT_OPEN, but never masks an error this package
+    // raised itself.
     if (OrientError.is(error)) throw error;
     throw cantOpenCause(error);
   } finally {
@@ -181,7 +181,7 @@ export interface WriteOrientationResult extends PatchResult {
 /**
  * Updates the orientation of a JPEG or AVIF file.
  *
- * A JPEG needs an existing orientation tag, like the v1 addon. An AVIF always gets an `irot`/`imir`
+ * A JPEG needs an existing orientation tag. An AVIF always gets an `irot`/`imir`
  * property: that is the only way to express orientation in the container and writing is always a
  * rewrite, with the `iloc` extents fixed up so the image data is preserved byte for byte.
  *

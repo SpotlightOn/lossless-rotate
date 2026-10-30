@@ -17,9 +17,13 @@
  *
  * `rotate90`/`rotate270`/`transpose`/`transverse` swap the axes, so the caller also has to swap the
  * sampling factors and the image dimensions.
+ *
+ * A crop belongs here too, because it is the simplest thing that can happen to a coefficient plane:
+ * whole blocks are selected, nothing inside them changes (`cropPlane`).
  */
 
 import type { OrientationPrimitive } from "../orientation.ts";
+import type { ComponentCrop } from "./geometry.ts";
 
 export interface CoefficientPlane {
   /** Row-major block grid, 64 natural-order coefficients per block. */
@@ -138,4 +142,31 @@ function signForSwapped(primitive: OrientationPrimitive, u: number, v: number): 
     default:
       return 1; // transpose
   }
+}
+
+/**
+ * Cuts `crop` out of a coefficient plane.
+ *
+ * This is the one coefficient-domain operation that changes nothing inside a block: the blocks of the
+ * region are copied in order and every coefficient keeps its value. It is therefore exact without any
+ * arithmetic - the only thing that can go wrong is the alignment, which `cropGeometry` owns.
+ *
+ * The result is a compact grid (stride = `widthInBlocks`), so the caller encodes it like any other
+ * plane; the source is left untouched.
+ */
+export function cropPlane(source: CoefficientPlane, crop: ComponentCrop): CoefficientPlane {
+  const { blocks, widthInBlocks: width, heightInBlocks: height } = source;
+  const sameGrid =
+    crop.blockOffsetX === 0 &&
+    crop.blockOffsetY === 0 &&
+    crop.widthInBlocks === width &&
+    crop.heightInBlocks === height;
+  if (sameGrid) return { blocks, widthInBlocks: width, heightInBlocks: height };
+
+  const cropped = new Int16Array(crop.widthInBlocks * crop.heightInBlocks * BLOCK_SIZE);
+  for (let row = 0; row < crop.heightInBlocks; row++) {
+    const from = ((row + crop.blockOffsetY) * width + crop.blockOffsetX) * BLOCK_SIZE;
+    cropped.set(blocks.subarray(from, from + crop.widthInBlocks * BLOCK_SIZE), row * crop.widthInBlocks * BLOCK_SIZE);
+  }
+  return { blocks: cropped, widthInBlocks: crop.widthInBlocks, heightInBlocks: crop.heightInBlocks };
 }

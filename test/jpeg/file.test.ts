@@ -1,5 +1,5 @@
 /**
- * Tests for the file-level API: the replacement for the v1 addon's fopen/fread/fwrite.
+ * Tests for the file-level API.
  *
  * The interesting property is that a metadata update must be indistinguishable from the original
  * file except for the orientation entry - same size, same image data, no re-encode.
@@ -29,7 +29,7 @@ interface Fixture {
 
 const manifest: { files: Fixture[] } = JSON.parse(readFileSync(join(fixturesDir, "manifest.json"), "utf8"));
 
-const workDir = await mkdtemp(join(tmpdir(), "jpegorientation-"));
+const workDir = await mkdtemp(join(tmpdir(), "lossless-rotate-file-"));
 process.on("exit", () => {
   void rm(workDir, { recursive: true, force: true });
 });
@@ -58,7 +58,7 @@ test("reads the orientation of every readable fixture from disk", async () => {
   }
 });
 
-test("surfaces missing and unreadable files as E_CANT_OPEN, like v1's -1", async () => {
+test("surfaces missing and unreadable files as E_CANT_OPEN", async () => {
   assert.equal(await codeOf(() => readOrientationFromFile(join(fixturesDir, "does-not-exist.jpg"))), "E_CANT_OPEN");
   assert.equal(await codeOf(() => writeOrientationToFile(join(fixturesDir, "does-not-exist.jpg"), 3)), "E_CANT_OPEN");
   await mkdir(join(workDir, "a-directory"), { recursive: true });

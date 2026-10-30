@@ -4,6 +4,10 @@
  * The output is always a baseline sequential JPEG that keeps the source's quantization tables and
  * its APPn/COM segments. Nothing is dequantized, no IDCT is performed and no coefficient is
  * modified except by transposition and sign, so the image data is preserved exactly.
+ *
+ * A crop is the same pipeline with a third step: the transform (if any), then a rectangle of whole
+ * blocks is selected, then the result is encoded. No coefficient changes, so a crop is lossless by
+ * construction - only its alignment can make the result differ from what was asked for.
  */
 
 import { OrientError } from "../errors.ts";
@@ -12,19 +16,40 @@ import { MARKER } from "../markers.ts";
 import { type OrientationPrimitive, transformFor } from "../orientation.ts";
 import { type ComponentCoefficients, decodeCoefficients } from "./decoder.ts";
 import { type EncodableComponent, encodeScan } from "./encoder.ts";
-import { type Frame, type FrameComponent, frameGeometry, isPerfectTransform, swapsAxes } from "./geometry.ts";
+import {
+  type CropRegion,
+  cropGeometry,
+  cropRegionToString,
+  type Frame,
+  type FrameComponent,
+  frameGeometry,
+  isPerfectTransform,
+  swapsAxes,
+} from "./geometry.ts";
 import { type PreservedSegment, parseJpeg, type QuantizationTable } from "./parse.ts";
 import { STANDARD_AC_TABLES, STANDARD_DC_TABLES, ZIGZAG_TO_NATURAL } from "./tables.ts";
-import { transformPlane } from "./transform.ts";
+import { cropPlane, transformPlane } from "./transform.ts";
 
 export interface TransformOptions {
   /** Transform for an Exif orientation value 1..8. Ignored when `primitive` is given. */
   orientation?: number;
   /** The transform to apply, "none" for a plain re-encode. */
   primitive?: OrientationPrimitive;
+  /**
+   * Crop the result to this region, in the coordinates of the image *after* the transform - the same
+   * way jpegtran counts `-crop`. The transform and the crop happen in one pass, so the image is
+   * decoded and encoded once.
+   *
+   * The origin is rounded down to the MCU grid (a block cannot be cut in half) and the far edge is
+   * left where it was asked for; see `cropGeometry`.
+   */
+  crop?: CropRegion;
   /** Value written into the Exif orientation tag of the result; `undefined` leaves it alone. */
   orientationInOutput?: number | undefined;
-  /** Refuse (`E_UNSUPPORTED`) instead of transforming when the transform cannot be perfect. */
+  /**
+   * Refuse (`E_UNSUPPORTED`) instead of exceeding what is losslessly achievable: a transform whose
+   * dimensions are not MCU aligned, and a crop region whose origin is not on the MCU grid.
+   */
   mcuAlignedOnly?: boolean;
   /** Keep the source's APPn/COM segments. Defaults to true. */
   keepMetadata?: boolean;
@@ -39,15 +64,26 @@ export interface TransformOptions {
   rotateThumbnail?: boolean;
 }
 
+/** The crop that was applied: what was asked for, and what the MCU grid allowed. */
+export interface AppliedCrop {
+  requested: CropRegion;
+  region: CropRegion;
+}
+
 export interface TransformResult {
   bytes: Buffer;
   /** The transform that was applied. */
   primitive: OrientationPrimitive;
-  /** False when the source was not MCU aligned, so edge padding moved into the visible area. */
+  /**
+   * True when the result is exactly what was asked for: the transform is MCU aligned (see
+   * `isPerfectTransform`) and, if a `crop` was given, its origin was on the MCU grid.
+   */
   perfect: boolean;
   /** Dimensions of the result. */
   width: number;
   height: number;
+  /** The crop that was applied, when `crop` was given. */
+  crop?: AppliedCrop;
   /** True when an embedded Exif thumbnail was transformed as well. */
   thumbnailRotated: boolean;
   /** Warnings about the result, e.g. a dropped restart interval or progressive input. */
@@ -297,8 +333,9 @@ export function transformJpeg(bytes: Uint8Array, options: TransformOptions = {})
     return { ...component, h: component.v, v: component.h };
   });
 
-  const encodable: EncodableComponent[] = coefficients.map((component, index) => {
-    const destination = destinationComponents[index]!;
+  // The transform first, then the crop: a crop region is expressed in the coordinates of the image
+  // as it is seen after the transform, which is also how jpegtran counts `-crop`.
+  const transformedPlanes = coefficients.map((component) => {
     const plane = singleComponent
       ? {
           blocks: cropToRealGrid(component),
@@ -310,34 +347,76 @@ export function transformJpeg(bytes: Uint8Array, options: TransformOptions = {})
           widthInBlocks: component.paddedWidthInBlocks,
           heightInBlocks: component.paddedHeightInBlocks,
         };
-    const transformed = transformPlane(plane, primitive);
-    return {
-      component: destination,
-      blocks: transformed.blocks,
-      strideInBlocks: transformed.widthInBlocks,
-      widthInBlocks: transformed.widthInBlocks,
-      heightInBlocks: transformed.heightInBlocks,
-      blocksPerMcuX: destination.h,
-      blocksPerMcuY: destination.v,
-    };
+    return transformPlane(plane, primitive);
   });
 
-  const width = swapsAxes(primitive) ? parsed.frame.height : parsed.frame.width;
-  const height = swapsAxes(primitive) ? parsed.frame.width : parsed.frame.height;
-  const destinationFrame: Frame = {
+  const transformedFrame: Frame = {
     ...parsed.frame,
     marker: 0xc0,
     progressive: false,
-    width,
-    height,
+    width: swapsAxes(primitive) ? parsed.frame.height : parsed.frame.width,
+    height: swapsAxes(primitive) ? parsed.frame.width : parsed.frame.height,
     components: destinationComponents,
     maxH: Math.max(...destinationComponents.map((component) => component.h)),
     maxV: Math.max(...destinationComponents.map((component) => component.v)),
   };
 
-  const mcuColumns = Math.ceil(width / (8 * destinationFrame.maxH));
-  const mcuRows = Math.ceil(height / (8 * destinationFrame.maxV));
-  const entropy = encodeScan(encodable, { singleComponent, mcuColumns, mcuRows });
+  let destinationFrame = transformedFrame;
+  let planes = transformedPlanes;
+  let crop: AppliedCrop | undefined;
+  let cropPerfect = true;
+
+  if (options.crop !== undefined) {
+    const transformedGeometry = frameGeometry(transformedFrame);
+    const geometry = cropGeometry(transformedGeometry, options.crop);
+    cropPerfect = geometry.perfect;
+    if (!geometry.perfect) {
+      const aligned = `${transformedGeometry.mcuWidth}x${transformedGeometry.mcuHeight}`;
+      const detail =
+        `the crop region ${cropRegionToString(options.crop)} does not start on the MCU grid (${aligned} pixels), ` +
+        `so a block would have to be cut in half`;
+      if (options.mcuAlignedOnly === true) {
+        throw new OrientError(
+          "E_UNSUPPORTED",
+          `${detail}. Start the crop at a multiple of ${aligned}, or drop mcuAlignedOnly to let the origin be rounded down`,
+        );
+      }
+      warnings.push(
+        `${detail}. Its origin was rounded down, so the result covers ${cropRegionToString(geometry.region)}. ` +
+          `Start the crop at a multiple of ${aligned} to get exactly ${cropRegionToString(options.crop)}.`,
+      );
+    }
+    destinationFrame = geometry.frame;
+    planes = transformedPlanes.map((plane, index) => cropPlane(plane, geometry.components[index]!));
+    crop = { requested: options.crop, region: geometry.region };
+  }
+
+  const destinationGeometry = frameGeometry(destinationFrame);
+  const encodable: EncodableComponent[] = planes.map((plane, index) => {
+    const destination = destinationFrame.components[index]!;
+    const visible = destinationGeometry.components[index]!;
+    return {
+      component: destination,
+      blocks: plane.blocks,
+      strideInBlocks: plane.widthInBlocks,
+      widthInBlocks: plane.widthInBlocks,
+      heightInBlocks: plane.heightInBlocks,
+      blocksPerMcuX: destination.h,
+      blocksPerMcuY: destination.v,
+      // Only a crop can leave a partial edge iMCU whose padding blocks are entirely outside the
+      // image; the transform path keeps the source's padding, as jpegtran does.
+      ...(crop === undefined || singleComponent
+        ? {}
+        : { visibleSizeInBlocks: { width: visible.widthInBlocks, height: visible.heightInBlocks } }),
+    };
+  });
+
+  const { width, height } = destinationFrame;
+  const entropy = encodeScan(encodable, {
+    singleComponent,
+    mcuColumns: destinationGeometry.mcuColumns,
+    mcuRows: destinationGeometry.mcuRows,
+  });
 
   const usedQuantIds = [...new Set(destinationComponents.map((component) => component.quantTableId))];
   const preserved: PreservedSegment[] = [];
@@ -357,6 +436,12 @@ export function transformJpeg(bytes: Uint8Array, options: TransformOptions = {})
       });
       warnings.push(...update.warnings);
       if (update.rotated) thumbnailRotated = true;
+      if (crop !== undefined && hasExifThumbnail(update.payload)) {
+        warnings.push(
+          "the embedded Exif thumbnail was not cropped: it still shows the uncropped image " +
+            "(a crop cannot be scaled down losslessly)",
+        );
+      }
       preserved.push(update.payload === entry.payload ? entry : { marker: entry.marker, payload: update.payload });
     }
   }
@@ -372,7 +457,30 @@ export function transformJpeg(bytes: Uint8Array, options: TransformOptions = {})
     Buffer.from([0xff, 0xd9]),
   ]);
 
-  return { bytes: output, primitive, perfect, width, height, thumbnailRotated, warnings };
+  return {
+    bytes: output,
+    primitive,
+    perfect: perfect && cropPerfect,
+    width,
+    height,
+    ...(crop === undefined ? {} : { crop }),
+    thumbnailRotated,
+    warnings,
+  };
+}
+
+/**
+ * True when an Exif payload carries an embedded thumbnail.
+ *
+ * A structurally broken block cannot say, and saying "there is a stale thumbnail" about a block that
+ * cannot be read would be noise, so it counts as "no thumbnail" here.
+ */
+function hasExifThumbnail(payload: Buffer): boolean {
+  try {
+    return locateExifThumbnail(payload, EXIF_SIGNATURE.length, payload.length) !== null;
+  } catch {
+    return false;
+  }
 }
 
 /** Copies the real block grid out of a padded grid. */

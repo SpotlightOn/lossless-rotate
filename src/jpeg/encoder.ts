@@ -5,6 +5,10 @@
  * and it never emits restart markers (dropping the restart interval is always legal and keeps the
  * output simple). Progressive input therefore comes out as a sequential file, which is still
  * lossless.
+ *
+ * The encoded grid is the padded one (whole MCUs). When the caller says which part of it is visible -
+ * as a crop does, because its far edge can fall inside an iMCU - the blocks outside are encoded blank
+ * instead of with the coefficients they happen to hold; see `EncodableComponent.visibleSizeInBlocks`.
  */
 
 import type { FrameComponent } from "./geometry.ts";
@@ -24,6 +28,16 @@ export interface EncodableComponent {
   heightInBlocks: number;
   blocksPerMcuX: number;
   blocksPerMcuY: number;
+  /**
+   * The real block grid of the image, when it is smaller than the padded grid that is encoded.
+   *
+   * Blocks outside it are padding of a partial edge iMCU and are encoded blank - no AC coefficients,
+   * and a DC difference of zero, so they decode to the previous block's DC. That is exactly what
+   * libjpeg-turbo does when it crops, and it keeps the part of the source that was cropped away from
+   * travelling along inside the file. A transform leaves this unset and keeps the source's padding,
+   * which is also what jpegtran does there.
+   */
+  visibleSizeInBlocks?: { width: number; height: number };
 }
 
 /** Encodes one block; returns the DC value so the caller can carry the predictor forward. */
@@ -34,7 +48,15 @@ function encodeBlock(
   block: Int16Array,
   base: number,
   predictor: number,
+  blank: boolean,
 ): number {
+  if (blank) {
+    // A padding block of the edge iMCU that cropping cut out of the image: DC difference 0 and EOB.
+    writer.putBits(dcTable.code[0]!, dcTable.size[0]!);
+    writer.putBits(acTable.code[0x00]!, acTable.size[0x00]!);
+    return predictor;
+  }
+
   const dc = block[base]!;
   const difference = dc - predictor;
   const category = magnitudeCategory(difference);
@@ -88,7 +110,8 @@ export function encodeScan(
     for (let row = 0; row < target.heightInBlocks; row++) {
       for (let column = 0; column < target.widthInBlocks; column++) {
         const base = (row * target.strideInBlocks + column) * BLOCK_SIZE;
-        predictors[0] = encodeBlock(writer, dcTables[0]!, acTables[0]!, target.blocks, base, predictors[0]!);
+        const blank = isPadding(target, column, row);
+        predictors[0] = encodeBlock(writer, dcTables[0]!, acTables[0]!, target.blocks, base, predictors[0]!, blank);
       }
     }
     writer.flush();
@@ -105,6 +128,7 @@ export function encodeScan(
             const row = mcuRow * target.blocksPerMcuY + y;
             const column = mcuColumn * target.blocksPerMcuX + x;
             const base = (row * target.strideInBlocks + column) * BLOCK_SIZE;
+            const blank = isPadding(target, column, row);
             predictors[componentIndex] = encodeBlock(
               writer,
               dcTables[index]!,
@@ -112,6 +136,7 @@ export function encodeScan(
               target.blocks,
               base,
               predictors[componentIndex]!,
+              blank,
             );
           }
         }
@@ -121,4 +146,10 @@ export function encodeScan(
 
   writer.flush();
   return writer.toBuffer();
+}
+
+/** True when the block at (column, row) lies outside the visible image. */
+function isPadding(target: EncodableComponent, column: number, row: number): boolean {
+  const visible = target.visibleSizeInBlocks;
+  return visible !== undefined && (column >= visible.width || row >= visible.height);
 }

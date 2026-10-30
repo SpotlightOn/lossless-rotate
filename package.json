@@ -1,6 +1,6 @@
 {
   "name": "@chimok/lossless-rotate",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "publishConfig": {
     "access": "public"
   },
@@ -12,7 +12,7 @@
   "bugs": {
     "url": "https://github.com/SpotlightOn/lossless-rotate/issues"
   },
-  "description": "Make JPEGs upright: read and write the EXIF orientation tag, rotate JPEGs losslessly in the DCT domain, and handle the orientation of AVIF.",
+  "description": "Make JPEGs upright or crop them: read and write the EXIF orientation tag, rotate and crop JPEGs losslessly in the DCT domain, and handle the orientation of AVIF.",
   "author": {
     "name": "SpotlightOn",
     "url": "https://github.com/SpotlightOn"
@@ -33,6 +33,7 @@
     "autorotate",
     "auto-rotate",
     "rotate",
+    "crop",
     "lossless",
     "jpegtran",
     "dct",

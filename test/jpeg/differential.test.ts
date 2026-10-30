@@ -16,6 +16,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { cropBuffer } from "../../src/crop.ts";
 import { transformJpeg } from "../../src/jpeg/codec.ts";
 import { decodeCoefficients } from "../../src/jpeg/decoder.ts";
 import { parseJpeg } from "../../src/jpeg/parse.ts";
@@ -227,4 +228,123 @@ test("imperfect transforms keep the geometry of jpegtran's output", { skip: !HAV
     }
   }
   assert.ok(compared >= 5, `expected some imperfect cases, got ${compared}`);
+});
+
+/** Decoded coefficients of a JPEG, in the shape the comparisons below need. */
+function coefficientsOf(bytes: Uint8Array) {
+  const frame = parseJpeg(bytes).frame;
+  return {
+    width: frame.width,
+    height: frame.height,
+    planes: decodeCoefficients(parseJpeg(bytes)).map((component) => {
+      const blocks = component.paddedWidthInBlocks * component.paddedHeightInBlocks * 64;
+      return [...component.blocks.subarray(0, blocks)];
+    }),
+  };
+}
+
+/** A grayscale JPEG made from a fixture, for the single component crop path. */
+function grayscaleFixture(): string {
+  const path = join(workDir, "grayscale.jpg");
+  const ppm = execFileSync("djpeg", ["-ppm", join(fixturesDir, "base/pattern-64x48-420.jpg")], {
+    maxBuffer: 1 << 28,
+  });
+  execFileSync("cjpeg", ["-grayscale", "-quality", "90", "-outfile", path], { input: ppm });
+  return path;
+}
+
+const CROP_CASES: [string, { x: number; y: number; width: number; height: number }][] = [
+  // Whole iMCUs: the case that is exact by definition.
+  ["base/pattern-64x48-420.jpg", { x: 16, y: 16, width: 32, height: 16 }],
+  ["base/pattern-64x48-422.jpg", { x: 16, y: 0, width: 32, height: 48 }],
+  ["base/pattern-64x48-444.jpg", { x: 8, y: 8, width: 24, height: 16 }],
+  ["base/pattern-64x48-progressive-420.jpg", { x: 16, y: 16, width: 32, height: 16 }],
+  // An origin that is not on the MCU grid, and a far edge inside an iMCU: jpegtran rounds the origin
+  // down and keeps the far edge, which is the rule this package follows.
+  ["base/pattern-64x48-420.jpg", { x: 5, y: 3, width: 20, height: 20 }],
+  ["base/pattern-64x48-420.jpg", { x: 16, y: 0, width: 20, height: 20 }],
+  // A source that is itself not MCU aligned (41x27, iMCU 16x16): its last iMCU is padding, and the
+  // crop keeps exactly those blocks.
+  ["base/pattern-41x27-420.jpg", { x: 16, y: 16, width: 25, height: 11 }],
+  // Smaller than one iMCU, and the whole image.
+  ["base/pattern-64x48-420.jpg", { x: 32, y: 32, width: 1, height: 1 }],
+  ["base/pattern-64x48-420.jpg", { x: 0, y: 0, width: 64, height: 48 }],
+];
+
+test("a crop is coefficient-identical to jpegtran's -crop", { skip: !HAVE_TOOLS }, () => {
+  const cases: [string, { x: number; y: number; width: number; height: number }][] = [
+    ...CROP_CASES,
+    [grayscaleFixture(), { x: 16, y: 16, width: 32, height: 16 }],
+    [grayscaleFixture(), { x: 5, y: 3, width: 20, height: 20 }],
+  ];
+
+  for (const [file, region] of cases) {
+    const sourcePath = file.startsWith("/") ? file : join(fixturesDir, file);
+    const spec = `${region.width}x${region.height}+${region.x}+${region.y}`;
+    // jpegtran needs the source on disk, and the grayscale case is generated into the work dir, so
+    // every case is written there rather than reaching into the corpus.
+    const source = readFileSync(sourcePath);
+    const sourceCopy = join(workDir, "source.jpg");
+    writeFileSync(sourceCopy, source);
+
+    const mine = cropBuffer(source, region);
+    const theirs = join(workDir, "theirs.jpg");
+    execFileSync("jpegtran", ["-crop", spec, "-outfile", theirs, sourceCopy]);
+
+    assert.deepEqual(coefficientsOf(mine.bytes), coefficientsOf(readFileSync(theirs)), `${file} ${spec}`);
+    const reference = parseJpeg(readFileSync(theirs)).frame;
+    assert.equal(mine.result.width, reference.width, `${file} ${spec} width`);
+    assert.equal(mine.result.height, reference.height, `${file} ${spec} height`);
+  }
+});
+
+test("a crop reproduces a literal pixel crop of the source", { skip: !HAVE_TOOLS }, () => {
+  for (const [file, region] of CROP_CASES) {
+    const source = join(fixturesDir, file);
+    const mine = cropBuffer(readFileSync(source), region);
+    const { x, y, width, height } = mine.result.region;
+    const spec = `${file} ${width}x${height}+${x}+${y}`;
+
+    const cropped = join(workDir, "cropped.jpg");
+    writeFileSync(cropped, mine.bytes);
+
+    // -nosmooth keeps djpeg from filtering across the new edge, so the comparison stays a literal
+    // copy of the source rectangle instead of an upsampling artefact.
+    const whole = parsePpm(execFileSync("djpeg", ["-nosmooth", "-ppm", source], { maxBuffer: 1 << 28 }));
+    const actual = parsePpm(execFileSync("djpeg", ["-nosmooth", "-ppm", cropped], { maxBuffer: 1 << 28 }));
+
+    assert.equal(actual.header, `P6 ${width} ${height}`, `${spec} dimensions`);
+    const expected = Buffer.alloc(width * height * 3);
+    for (let row = 0; row < height; row++) {
+      const from = ((row + y) * whole.width + x) * 3;
+      whole.pixels.copy(expected, row * width * 3, from, from + width * 3);
+    }
+    assert.deepEqual(actual.pixels, expected, `${spec} pixels are the source rectangle, byte for byte`);
+  }
+});
+
+test("rotate and crop in one pass matches jpegtran's -rotate -crop", { skip: !HAVE_TOOLS }, () => {
+  const file = "base/pattern-64x48-420.jpg";
+  const source = readFileSync(join(fixturesDir, file));
+  const region = { x: 0, y: 16, width: 32, height: 32 };
+
+  // jpegtran counts -crop after the transform, so a 90 degree turn is cropped in the turned image.
+  const mine = transformJpeg(source, { primitive: "rotate90", crop: region });
+  const minePath = join(workDir, "combined.jpg");
+  writeFileSync(minePath, mine.bytes);
+
+  const theirs = join(workDir, "theirs.jpg");
+  execFileSync("jpegtran", [
+    "-rotate",
+    "90",
+    "-crop",
+    `${region.width}x${region.height}+${region.x}+${region.y}`,
+    "-outfile",
+    theirs,
+    join(fixturesDir, file),
+  ]);
+
+  assert.deepEqual(coefficientsOf(mine.bytes), coefficientsOf(readFileSync(theirs)));
+  assert.equal(mine.width, parseJpeg(readFileSync(theirs)).frame.width);
+  assert.equal(mine.height, parseJpeg(readFileSync(theirs)).frame.height);
 });

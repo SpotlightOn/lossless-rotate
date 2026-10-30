@@ -7,7 +7,7 @@
  * know which format a test is about.
  */
 
-import { type ExecFileSyncOptionsWithStringEncoding, execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -91,13 +91,14 @@ export function scratch(t: TestContext): string {
 /** Runs the CLI in `cwd` and reports the exit status instead of throwing. */
 export function run(args: string[], cwd: string): { stdout: string; stderr: string; status: number } {
   const cli = join(packageRoot, "bin", "lossless-rotate.ts");
-  // `stdio` is explicit: `execFileSync` otherwise echoes the child's stderr to the parent's stderr,
-  // which would print the CLI's own error messages (and usage) into the test output.
-  const options: ExecFileSyncOptionsWithStringEncoding = { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
-  try {
-    return { stdout: execFileSync(process.execPath, [cli, ...args], options), stderr: "", status: 0 };
-  } catch (error) {
-    const failed = error as { status?: number; stdout?: string; stderr?: string };
-    return { stdout: failed.stdout ?? "", stderr: failed.stderr ?? "", status: failed.status ?? 1 };
-  }
+  // `spawnSync` rather than `execFileSync`, because the warnings the CLI prints to stderr matter even
+  // when it succeeds, and `execFileSync` only hands back stdout. `stdio` is explicit: otherwise the
+  // child's stderr would be echoed into the parent's stderr, which would print the CLI's own error
+  // messages and usage into the test output.
+  const child = spawnSync(process.execPath, [cli, ...args], {
+    cwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  return { stdout: child.stdout ?? "", stderr: child.stderr ?? "", status: child.status ?? 1 };
 }
