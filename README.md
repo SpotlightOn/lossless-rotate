@@ -1,6 +1,7 @@
 # @chimok/lossless-rotate
 
 [![CI](https://github.com/SpotlightOn/lossless-rotate/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SpotlightOn/lossless-rotate/actions/workflows/ci.yml)
+[![Coverage](./.github/badges/coverage.svg)](https://github.com/SpotlightOn/lossless-rotate/actions/workflows/ci.yml)
 [![Socket](https://github.com/SpotlightOn/lossless-rotate/actions/workflows/socket.yml/badge.svg?branch=main)](https://github.com/SpotlightOn/lossless-rotate/actions/workflows/socket.yml)
 [![Node](https://img.shields.io/badge/node-%E2%89%A524-brightgreen)](https://nodejs.org)
 [![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
@@ -15,7 +16,7 @@ This is a pure TypeScript version of `jpegtran`. There is also a WASM version, w
 
 
 The AVIF `irot`/`imir` properties are defined by the HEIF standard,
-[ISO/IEC 23008-12](https://www.iso.org/standard/83650.html), and listed for AVIF in the
+[ISO/IEC 23008-12:2025](https://www.iso.org/standard/89035.html), and listed for AVIF in the
 [AVIF specification](https://aomediacodec.github.io/av1-avif/) (§9.1.2). Not every browser applies them
 yet, but they are the lossless way to orient an AVIF, so they are supported here for the future.
 
@@ -366,6 +367,7 @@ offsets, and whether `meta` had to be rebuilt).
 ```sh
 pnpm build          # tsc -p tsconfig.build.json -> dist/
 pnpm test           # node --test  (131 tests)
+pnpm run coverage   # node --test under V8 coverage -> coverage/lcov.info + badge
 pnpm run typecheck  # tsc --noEmit
 pnpm run lint       # biome check .
 pnpm run lint:fix   # biome check --write .   (formats and sorts imports)
@@ -376,6 +378,10 @@ the public API) and holds the shared fixture and CLI helpers, `test/jpeg/` and `
 format-specific suites, and `test/fixtures/` is the corpus both read.
 
 Linting and formatting use [Biome](https://biomejs.dev); the configuration is in `biome.json`.
+
+Coverage runs on Node's own test runner (`scripts/coverage.mjs`), so there is no coverage dependency and
+no badge service. It writes `coverage/lcov.info` and refreshes the committed badge in
+`.github/badges/coverage.svg`; CI warns when the badge is stale and fails below the script's thresholds.
 
 The published package is built with `pnpm run build` (`tsc -p tsconfig.build.json`) into `dist/`:
 JavaScript plus `.d.ts`, with the relative `.ts` import specifiers rewritten to `.js`. Shipping the

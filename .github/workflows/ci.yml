@@ -75,3 +75,43 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/setup@v3
+        with:
+          runtime: node@24
+          cache: true
+          require-lockfile: true
+
+      # Same tools as the test job plus the AVIF ones: a suite that skips itself shrinks the report,
+      # and the thresholds are set for a run where every suite actually executed.
+      - name: Install codec tools
+        run: sudo apt-get update && sudo apt-get install -y libjpeg-turbo-progs libavif-bin imagemagick
+
+      # Fails below the thresholds in the script, and refreshes .github/badges/coverage.svg on the
+      # way. The badge is a committed file (no badge service), so it is only written, not pushed.
+      - name: Coverage
+        run: node scripts/coverage.mjs --summary "$GITHUB_STEP_SUMMARY"
+
+      # The badge only stays honest if someone regenerates it. A warning rather than a failure:
+      # adding tests must not turn the pipeline red.
+      - name: Check the badge is up to date
+        run: |
+          if ! git diff --quiet -- .github/badges/coverage.svg; then
+            echo "::warning::.github/badges/coverage.svg is stale - run 'pnpm run coverage' and commit the result"
+          fi
+
+      - name: Upload the lcov report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: coverage/lcov.info
+          if-no-files-found: ignore
