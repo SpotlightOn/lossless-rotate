@@ -8,7 +8,6 @@ on:
 
 env:
   FORCE_COLOR: 2
-  NODE: 24 # The Node.js version to build and publish from
 
 permissions:
   contents: write # create the GitHub release
@@ -24,11 +23,9 @@ jobs:
         with:
           persist-credentials: false
 
-      # pnpm 12 requires pnpm/setup; it installs pnpm (from `packageManager`), Node.js and the
-      # dependencies in one step.
+      # pnpm comes from `packageManager`, Node.js from .nvmrc; the frozen install runs in the same step.
       - uses: pnpm/setup@v3
         with:
-          runtime: node@${{ env.NODE }}
           cache: true
           require-lockfile: true
 

@@ -2,6 +2,10 @@ node_modules/
 npm-debug.log*
 dist/
 
+# Coverage run output (scripts/coverage.mjs). Only the generated badge in .github/badges/ is
+# committed; lcov.info is a local, regenerable artifact.
+coverage/
+
 # Scratch output of the CLI (bin/lossless-rotate.ts) and of manual experiments. Safe to delete at
 # any time; nothing in here is needed to build, test or publish the package.
 tmp/

@@ -18,13 +18,10 @@ jobs:
         with:
           persist-credentials: false
 
-      # pnpm 12 is a self-contained binary that installs runtimes itself, so it needs pnpm/setup,
-      # not pnpm/action-setup (which went through npm and cannot install pnpm 12). The action reads
-      # the pnpm version from package.json's `packageManager`, installs Node.js, caches the store
-      # and runs the frozen install; a stale lockfile fails here instead of later.
+      # Node.js comes from .nvmrc, pnpm from package.json's `packageManager`. The action caches the
+      # store and runs the frozen install, so a stale lockfile fails here instead of later.
       - uses: pnpm/setup@v3
         with:
-          runtime: node@24
           cache: true
           require-lockfile: true
 
@@ -49,6 +46,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        # An explicit version overrides .nvmrc: the matrix spans the minimum supported version
+        # (`engines`) and the current one.
         node: [24, 26]
 
     steps:
@@ -56,7 +55,6 @@ jobs:
         with:
           persist-credentials: false
 
-      # See the lint job: pnpm 12 requires pnpm/setup, which installs this matrix's Node.js too.
       - uses: pnpm/setup@v3
         with:
           runtime: node@${{ matrix.node }}
@@ -65,6 +63,7 @@ jobs:
 
       # jpegtran/djpeg turn the differential tests on. They are optional; the suite skips them
       # wherever they are missing, so runners without them only exercise the pure-JS path.
+      # libavif-bin is deliberately absent: Ubuntu's avifdec does not apply irot/imir on decode.
       - name: Install libjpeg-turbo tools (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libjpeg-turbo-progs
@@ -75,3 +74,40 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/setup@v3
+        with:
+          cache: true
+          require-lockfile: true
+
+      - name: Install codec tools
+        run: sudo apt-get update && sudo apt-get install -y libjpeg-turbo-progs
+
+      # Fails below the thresholds in the script, and refreshes .github/badges/coverage.svg on the
+      # way. The badge is a committed file (no badge service), so it is only written, not pushed.
+      - name: Coverage
+        run: node scripts/coverage.mjs --summary "$GITHUB_STEP_SUMMARY"
+
+      # The badge only stays honest if someone regenerates it. A warning rather than a failure:
+      # adding tests must not turn the pipeline red.
+      - name: Check the badge is up to date
+        run: |
+          if ! git diff --quiet -- .github/badges/coverage.svg; then
+            echo "::warning::.github/badges/coverage.svg is stale - run 'pnpm run coverage' and commit the result"
+          fi
+
+      - name: Upload the lcov report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-lcov
+          path: coverage/lcov.info
+          if-no-files-found: ignore
