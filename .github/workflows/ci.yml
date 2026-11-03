@@ -86,7 +86,9 @@ jobs:
 
       - uses: pnpm/setup@v3
         with:
-          runtime: node@24
+          # Node 26 has `--test-coverage-include-all`, so a source file no test loads shows up as
+          # 0 % instead of silently missing. The script itself also runs on 24 (`pnpm run coverage`).
+          runtime: node@26
           cache: true
           require-lockfile: true
 
@@ -110,7 +112,7 @@ jobs:
 
       - name: Upload the lcov report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-lcov
           path: coverage/lcov.info

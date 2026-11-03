@@ -113,13 +113,20 @@ const summaryPath = summaryIndex === -1 ? undefined : process.argv[summaryIndex 
 
 mkdirSync(dirname(lcovPath), { recursive: true });
 
+/**
+ * `--test-coverage-include-all` (unloaded source files count as 0 %) only exists from Node 26 on and
+ * Node rejects the whole run with "bad option" below that. The package supports Node 24, so the flag
+ * is passed only where the runtime knows it; without it the report covers the files the suite loaded.
+ */
+const includeAll = process.allowedNodeEnvironmentFlags.has("--test-coverage-include-all");
+
 const run = spawnSync(
   process.execPath,
   [
     "--test",
     "--experimental-test-coverage",
     "--test-coverage-include=src/**",
-    "--test-coverage-include-all",
+    ...(includeAll ? ["--test-coverage-include-all"] : []),
     `--test-coverage-lines=${thresholds.lines}`,
     `--test-coverage-branches=${thresholds.branches}`,
     `--test-coverage-functions=${thresholds.functions}`,
