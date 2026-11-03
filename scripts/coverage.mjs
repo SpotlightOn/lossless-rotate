@@ -8,8 +8,8 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** Repository root, resolved from this file so the script works from any working directory. */
@@ -98,6 +98,20 @@ function readTotals(lcov) {
   return total;
 }
 
+/**
+ * Every file under `src/` has to show up in the report. The runner only lists the files the suite
+ * loaded (`--test-coverage-include-all` would add the rest, but it only exists from Node 26 on), so
+ * without this check a new source file that no test imports would stay invisible to the thresholds.
+ */
+function unreportedSources(lcov) {
+  const reported = new Set([...lcov.matchAll(/^SF:(.+)$/gm)].map(([, file]) => file.replaceAll("\\", "/")));
+
+  return readdirSync(join(packageRoot, "src"), { recursive: true })
+    .filter((entry) => entry.endsWith(".ts"))
+    .map((entry) => `src/${entry.split(sep).join("/")}`)
+    .filter((entry) => !reported.has(entry));
+}
+
 /** Markdown table for `$GITHUB_STEP_SUMMARY`, so the numbers show up on the job page. */
 function summaryTable(total) {
   const rows = Object.entries(total).map(([name, { hit, found }]) => {
@@ -113,20 +127,12 @@ const summaryPath = summaryIndex === -1 ? undefined : process.argv[summaryIndex 
 
 mkdirSync(dirname(lcovPath), { recursive: true });
 
-/**
- * `--test-coverage-include-all` (unloaded source files count as 0 %) only exists from Node 26 on and
- * Node rejects the whole run with "bad option" below that. The package supports Node 24, so the flag
- * is passed only where the runtime knows it; without it the report covers the files the suite loaded.
- */
-const includeAll = process.allowedNodeEnvironmentFlags.has("--test-coverage-include-all");
-
 const run = spawnSync(
   process.execPath,
   [
     "--test",
     "--experimental-test-coverage",
     "--test-coverage-include=src/**",
-    ...(includeAll ? ["--test-coverage-include-all"] : []),
     `--test-coverage-lines=${thresholds.lines}`,
     `--test-coverage-branches=${thresholds.branches}`,
     `--test-coverage-functions=${thresholds.functions}`,
@@ -146,7 +152,15 @@ if (run.error) {
 // A crashed run leaves no or a partial report; the exit code from the test runner says what happened.
 if (!existsSync(lcovPath)) process.exit(run.status ?? 1);
 
-const total = readTotals(readFileSync(lcovPath, "utf8"));
+const lcov = readFileSync(lcovPath, "utf8");
+const missing = unreportedSources(lcov);
+
+if (missing.length > 0) {
+  console.error(`no coverage entry for ${missing.join(", ")} - no test imports them`);
+  process.exit(1);
+}
+
+const total = readTotals(lcov);
 const linePercent = percent(total.lines.hit, total.lines.found);
 const svg = badgeSvg(badgeLabel, formatPercent(linePercent), badgeColor(linePercent));
 const unchanged = existsSync(badgePath) && readFileSync(badgePath, "utf8") === svg;
