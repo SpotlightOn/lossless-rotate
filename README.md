@@ -2,7 +2,8 @@
 
 [![CI](https://github.com/SpotlightOn/lossless-rotate/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SpotlightOn/lossless-rotate/actions/workflows/ci.yml)
 [![Coverage](./.github/badges/coverage.svg)](https://github.com/SpotlightOn/lossless-rotate/actions/workflows/ci.yml)
-[![Socket](https://github.com/SpotlightOn/lossless-rotate/actions/workflows/socket.yml/badge.svg?branch=main)](https://github.com/SpotlightOn/lossless-rotate/actions/workflows/socket.yml)
+[![Socket](https://badge.socket.dev/npm/package/@chimok/lossless-rotate)](https://socket.dev/npm/package/@chimok/lossless-rotate)
+[![npm](https://img.shields.io/npm/v/@chimok/lossless-rotate)](https://www.npmjs.com/package/@chimok/lossless-rotate)
 [![Node](https://img.shields.io/badge/node-%E2%89%A524-brightgreen)](https://nodejs.org)
 [![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
